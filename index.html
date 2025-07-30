@@ -42,7 +42,7 @@
     <div id="result-area">
         <div id="copy-preview">
             <span id="preview-text"></span>
-            <button id="copy-button">📋</button>
+            <button id="copy-button">Copy</button>
         </div>
         <details id="edit-controls">
             <summary>作者・タイトル・巻数を編集</summary>
@@ -50,12 +50,12 @@
                 <div class="control-group">
                     <label for="author-input">作者名</label>
                     <input type="text" id="author-input">
-                    <button class="copy-part-btn" data-target="author-input">📋</button>
+                    <button class="copy-part-btn" data-target="author-input">Copy</button>
                 </div>
                 <div class="control-group">
                     <label for="title-input">タイトル</label>
                     <input type="text" id="title-input">
-                    <button class="copy-part-btn" data-target="title-input">📋</button>
+                    <button class="copy-part-btn" data-target="title-input">Copy</button>
                 </div>
                 <div class="control-group">
                     <label for="volumeA-input">巻数</label>
@@ -218,7 +218,7 @@
         });
         copyButton.addEventListener('click', () => {
             navigator.clipboard.writeText(generateFinalString()).then(() => {
-                copyButton.textContent = '✅'; // チェックマークに変更
+                copyButton.textContent = 'Done'; // チェックマークに変更
                 setTimeout(() => { copyButton.textContent = '📋'; }, 1500); // アイコンに戻す
             });
         });
@@ -228,7 +228,7 @@
                 const targetId = e.target.dataset.target;
                 const targetInput = document.getElementById(targetId);
                 navigator.clipboard.writeText(targetInput.value).then(() => {
-                    e.target.textContent = '✅'; // チェックマークに変更
+                    e.target.textContent = 'Done'; // チェックマークに変更
                     setTimeout(() => { e.target.textContent = '📋'; }, 1500); // アイコンに戻す
                 });
             });
