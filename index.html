@@ -3,69 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>漫画表紙検索</title>
+    <title>漫画表紙 全巻検索</title>
     <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 2em auto; padding: 0 1em; }
-        input[type="text"] { width: 70%; padding: 0.8em; font-size: 1em; }
+        body { font-family: sans-serif; max-width: 960px; margin: 1em auto; padding: 0 1em; }
+        .controls { display: flex; gap: 8px; }
+        input[type="text"] { flex-grow: 1; padding: 0.8em; font-size: 1em; }
         button { padding: 0.8em; font-size: 1em; }
-        #result { margin-top: 2em; text-align: center; }
-        img { max-width: 250px; border: 1px solid #ccc; }
-        .loading, .error { font-size: 1.2em; color: #555; }
+        #copy-area { display: none; margin-top: 1em; background-color: #f0f0f0; padding: 12px; border-radius: 8px; }
+        #copy-container { display: flex; align-items: center; gap: 8px; }
+        #copy-text { flex-grow: 1; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #copy-button { font-size: 0.9em; padding: 0.6em; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        #volume-controls { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+        #volume-controls input[type="number"] { width: 60px; padding: 0.5em; text-align: center; }
+        #volume-controls span { margin: 0 4px; }
+        #result-grid { margin-top: 1.5em; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px; }
+        .cover-item img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; transition: transform 0.2s; }
+        .cover-item img:hover { transform: scale(1.05); }
+        .loading, .error { grid-column: 1 / -1; font-size: 1.2em; color: #555; text-align: center; }
+        #lightbox { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; z-index: 1000; }
+        #lightbox-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #close-button { position: absolute; top: 20px; right: 30px; font-size: 3em; color: white; cursor: pointer; line-height: 0.5; }
     </style>
 </head>
 <body>
-    <h1>漫画表紙検索ツール</h1>
-    <input type="text" id="mangaTitle" placeholder="漫画のタイトルを入力">
-    <button id="searchButton">検索</button>
-    <div id="result"></div>
+    <h1>漫画表紙 全巻検索</h1>
+    <div class="controls">
+        <input type="text" id="mangaTitle" placeholder="漫画のタイトルを入力">
+        <button id="searchButton">検索</button>
+    </div>
+    <div id="copy-area">
+        <div id="copy-container">
+            <span id="copy-text"></span>
+            <button id="copy-button">コピー</button>
+        </div>
+        <div id="volume-controls">
+            <input type="number" id="volumeA" placeholder="全/開始巻" min="1">
+            <span>-</span>
+            <input type="number" id="volumeB" placeholder="最終巻" min="1">
+            <label>巻</label>
+        </div>
+    </div>
+    <div id="result-grid"></div>
+    <div id="lightbox">
+        <span id="close-button">&times;</span>
+        <img id="lightbox-img" src="">
+    </div>
 
     <script>
-        const searchButton = document.getElementById('searchButton');
         const mangaTitleInput = document.getElementById('mangaTitle');
-        const resultDiv = document.getElementById('result');
+        const searchButton = document.getElementById('searchButton');
+        const resultGrid = document.getElementById('result-grid');
+        const copyArea = document.getElementById('copy-area');
+        const copyTextSpan = document.getElementById('copy-text');
+        const copyButton = document.getElementById('copy-button');
+        const volumeA_Input = document.getElementById('volumeA');
+        const volumeB_Input = document.getElementById('volumeB');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        const closeButton = document.getElementById('close-button');
 
-        const searchCover = async () => {
-            const title = mangaTitleInput.value.trim();
-            if (!title) {
-                alert('タイトルを入力してください。');
-                return;
+        let currentAuthor = '';
+        let currentTitle = '';
+
+        const extractVolumeNumber = (title) => {
+            if (!title) return Infinity;
+            const match = title.match(/(?:[ (\[第#]|\bVol\.\s?)(\d+)/);
+            return match ? parseInt(match[1], 10) : Infinity;
+        };
+        
+        const updateCopyText = () => {
+            if (!currentAuthor) return;
+            const valA = volumeA_Input.value;
+            const valB = volumeB_Input.value;
+            let displayText = `[${currentAuthor}] ${currentTitle}`;
+            if (valA && valB) {
+                displayText = `[${currentAuthor}] ${currentTitle} 第${valA}-${valB}巻`;
+            } else if (valA) {
+                displayText = `[${currentAuthor}] ${currentTitle} 全${valA}巻`;
             }
+            copyTextSpan.textContent = displayText;
+        };
 
-            resultDiv.innerHTML = '<div class="loading">検索中...</div>';
+        const searchCovers = async () => {
+            currentTitle = mangaTitleInput.value.trim();
+            if (!currentTitle) return;
 
-            // Google Books APIのエンドポイント
-            // 検索クエリに「1巻」を加えて、1巻のヒット率を上げる
-            const encodedTitle = encodeURIComponent(title);
-            const url = `https://www.googleapis.com/books/v1/volumes?q=${encodedTitle}+1巻&langRestrict=ja&printType=books`;
+            resultGrid.innerHTML = '<div class="loading">検索中...</div>';
+            copyArea.style.display = 'none'; 
+            
+            const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(currentTitle)}&langRestrict=ja&printType=books&maxResults=40`;
 
             try {
                 const response = await fetch(url);
                 const data = await response.json();
+                resultGrid.innerHTML = ''; 
 
-                if (data.totalItems > 0 && data.items[0].volumeInfo.imageLinks) {
-                    // 最初にヒットした書籍のサムネイル画像を取得
-                    const imageUrl = data.items[0].volumeInfo.imageLinks.thumbnail.replace('http://', 'https://');
+                if (data.totalItems > 0 && data.items?.length > 0) {
+                    data.items.sort((a, b) => {
+                        const volA = extractVolumeNumber(a.volumeInfo.title);
+                        const volB = extractVolumeNumber(b.volumeInfo.title);
+                        return volA - volB;
+                    });
                     
-                    resultDiv.innerHTML = `
-                        <a href="${data.items[0].volumeInfo.infoLink}" target="_blank">
-                            <img src="${imageUrl}" alt="${title} 1巻">
-                        </a>
-                    `;
+                    const firstItem = data.items[0];
+                    currentAuthor = firstItem.volumeInfo?.authors?.[0] || '';
+                    if (currentAuthor) {
+                        updateCopyText();
+                        copyArea.style.display = 'block'; 
+                    }
+                    
+                    // --- ★★★ ここが抜けていました ★★★ ---
+                    const uniqueCovers = new Map();
+                    data.items.forEach(item => {
+                        if (item.volumeInfo.imageLinks?.thumbnail) {
+                            const imageUrl = item.volumeInfo.imageLinks.thumbnail.replace('http://', 'https://');
+                            if (!uniqueCovers.has(imageUrl)) {
+                                uniqueCovers.set(imageUrl, {
+                                    title: item.volumeInfo.title || currentTitle,
+                                    imageUrl: imageUrl
+                                });
+                            }
+                        }
+                    });
+
+                    uniqueCovers.forEach(book => {
+                        const coverDiv = document.createElement('div');
+                        coverDiv.className = 'cover-item';
+                        coverDiv.innerHTML = `<img src="${book.imageUrl}" alt="${book.title}">`;
+                        resultGrid.appendChild(coverDiv);
+                    });
+                    // --- ★★★ ここまで ★★★ ---
+
                 } else {
-                    resultDiv.innerHTML = '<div class="error">1巻の表紙が見つかりませんでした。</div>';
+                    resultGrid.innerHTML = '<div class="error">作品が見つかりませんでした。</div>';
                 }
             } catch (error) {
-                console.error('Error fetching data:', error);
-                resultDiv.innerHTML = '<div class="error">検索中にエラーが発生しました。</div>';
+                console.error("検索エラー:", error);
+                resultGrid.innerHTML = '<div class="error">検索中にエラーが発生しました。</div>';
             }
         };
 
-        searchButton.addEventListener('click', searchCover);
-        mangaTitleInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                searchCover();
+        searchButton.addEventListener('click', searchCovers);
+        mangaTitleInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCovers(); });
+        volumeA_Input.addEventListener('input', updateCopyText);
+        volumeB_Input.addEventListener('input', updateCopyText);
+
+        copyButton.addEventListener('click', () => {
+            navigator.clipboard.writeText(copyTextSpan.textContent).then(() => {
+                copyButton.textContent = 'コピー完了！';
+                setTimeout(() => { copyButton.textContent = 'コピー'; }, 1500);
+            });
+        });
+        
+        resultGrid.addEventListener('click', (e) => {
+            if (e.target.tagName === 'IMG') {
+                const highResUrl = e.target.src.replace(/&zoom=\d+/, '&zoom=0');
+                lightboxImg.src = highResUrl;
+                lightbox.style.display = 'flex';
             }
         });
+
+        const closeLightbox = () => { lightbox.style.display = 'none'; };
+        closeButton.addEventListener('click', closeLightbox);
+        lightbox.addEventListener('click', (e) => { if (e.target === lightbox) { closeLightbox(); } });
     </script>
 </body>
 </html>
