@@ -5,35 +5,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>漫画表紙 全巻検索</title>
     <style>
+        /* 基本的なスタイル */
         body { font-family: sans-serif; max-width: 960px; margin: 1em auto; padding: 0 1em; }
-        .controls { display: flex; gap: 8px; }
-        input[type="text"] { flex-grow: 1; padding: 0.8em; font-size: 1em; }
-        button { padding: 0.8em; font-size: 1em; }
+        * { box-sizing: border-box; } /* サイズ計算を簡単に */
+
+        /* 検索コントロール */
+        .input-wrapper { display: flex; align-items: center; gap: 8px; position: relative; }
+        input[type="text"] { flex-grow: 1; padding: 0.8em; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 0.8em; font-size: 1em; border: none; background-color: #007bff; color: white; border-radius: 5px; cursor: pointer; flex-shrink: 0; }
+        
+        /* クリアボタン */
+        .clear-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            font-size: 1.5em;
+            color: #999;
+            display: none;
+            line-height: 1;
+        }
+        #search-wrapper .clear-btn { right: 90px; }
+
+        /* コピーエリア */
         #copy-area { display: none; margin-top: 1em; background-color: #f0f0f0; padding: 12px; border-radius: 8px; }
         #copy-container { display: flex; align-items: center; gap: 8px; }
-        #copy-text { flex-grow: 1; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #copy-button { font-size: 0.9em; padding: 0.6em; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        #volume-controls { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-        #volume-controls input[type="number"] { width: 60px; padding: 0.5em; text-align: center; }
+        
+        /* ★★★ 作者名入力ボックスのサイズ問題を修正 ★★★ */
+        #author-input {
+            width: 20px; /* ご指定のサイズに */
+            min-width: 0; /* ブラウザの最小幅を上書き */
+            font-size: 0.9em;
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+            padding: 2px 4px;
+        }
+        #copy-text-display { flex-grow: 1; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 4px; }
+        #copy-button { font-size: 0.9em; padding: 0.6em; margin-left: auto; }
+        
+        /* 巻数入力エリア */
+        #volume-controls { position: relative; display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+        #volume-controls input[type="number"] { width: 70px; padding: 0.5em; text-align: center; border: 1px solid #ccc; border-radius: 5px; }
         #volume-controls span { margin: 0 4px; }
+        #volume-controls .clear-btn { right: 35px; }
+
+        /* 結果グリッド */
         #result-grid { margin-top: 1.5em; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px; }
         .cover-item img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; transition: transform 0.2s; }
-        .cover-item img:hover { transform: scale(1.05); }
         .loading, .error { grid-column: 1 / -1; font-size: 1.2em; color: #555; text-align: center; }
-        #lightbox { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; z-index: 1000; }
+
+        /* ライトボックス */
+        #lightbox { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; padding: 20px; z-index: 1000; }
         #lightbox-img { max-width: 100%; max-height: 100%; object-fit: contain; }
         #close-button { position: absolute; top: 20px; right: 30px; font-size: 3em; color: white; cursor: pointer; line-height: 0.5; }
     </style>
 </head>
 <body>
     <h1>漫画表紙 全巻検索</h1>
-    <div class="controls">
+    <div class="input-wrapper" id="search-wrapper">
         <input type="text" id="mangaTitle" placeholder="漫画のタイトルを入力">
+        <span class="clear-btn" id="clear-search">&times;</span>
         <button id="searchButton">検索</button>
     </div>
     <div id="copy-area">
         <div id="copy-container">
-            <span id="copy-text"></span>
+            [<input type="text" id="author-input" placeholder="作者名">]
+            <span id="copy-text-display"></span>
             <button id="copy-button">コピー</button>
         </div>
         <div id="volume-controls">
@@ -41,6 +79,7 @@
             <span>-</span>
             <input type="number" id="volumeB" placeholder="最終巻" min="1">
             <label>巻</label>
+            <span class="clear-btn" id="clear-volumes">&times;</span>
         </div>
     </div>
     <div id="result-grid"></div>
@@ -50,39 +89,73 @@
     </div>
 
     <script>
+        // --- 要素取得 ---
         const mangaTitleInput = document.getElementById('mangaTitle');
         const searchButton = document.getElementById('searchButton');
         const resultGrid = document.getElementById('result-grid');
         const copyArea = document.getElementById('copy-area');
-        const copyTextSpan = document.getElementById('copy-text');
+        const authorInput = document.getElementById('author-input');
+        const copyTextDisplay = document.getElementById('copy-text-display');
         const copyButton = document.getElementById('copy-button');
         const volumeA_Input = document.getElementById('volumeA');
         const volumeB_Input = document.getElementById('volumeB');
         const lightbox = document.getElementById('lightbox');
         const lightboxImg = document.getElementById('lightbox-img');
         const closeButton = document.getElementById('close-button');
+        const clearSearchBtn = document.getElementById('clear-search');
+        const clearVolumesBtn = document.getElementById('clear-volumes');
 
-        let currentAuthor = '';
+        // --- グローバル変数 ---
         let currentTitle = '';
 
+        // --- 関数定義 ---
         const extractVolumeNumber = (title) => {
             if (!title) return Infinity;
             const match = title.match(/(?:[ (\[第#]|\bVol\.\s?)(\d+)/);
             return match ? parseInt(match[1], 10) : Infinity;
         };
         
-        const updateCopyText = () => {
-            if (!currentAuthor) return;
+        const findBestAuthor = (items) => {
+            const authorCounts = new Map();
+            const sampleItems = items.slice(0, 10);
+            sampleItems.forEach(item => {
+                if (item.volumeInfo?.authors) {
+                    item.volumeInfo.authors.forEach(author => {
+                        authorCounts.set(author, (authorCounts.get(author) || 0) + 1);
+                    });
+                }
+            });
+            if (authorCounts.size === 0) return '';
+            let maxCount = 0;
+            let bestAuthors = [];
+            for (const [author, count] of authorCounts.entries()) {
+                if (count > maxCount) {
+                    maxCount = count;
+                    bestAuthors = [author];
+                } else if (count === maxCount) {
+                    bestAuthors.push(author);
+                }
+            }
+            if (bestAuthors.length === 1) return bestAuthors[0];
+            const japaneseAuthor = bestAuthors.find(author => /[一-龠ぁ-んァ-ヶ]/.test(author));
+            return japaneseAuthor || bestAuthors[0];
+        };
+
+        const updateCopyTextDisplay = () => {
             const valA = volumeA_Input.value;
             const valB = volumeB_Input.value;
-            let displayText = `[${currentAuthor}] ${currentTitle}`;
+            let displayText = currentTitle;
             if (valA && valB) {
-                displayText = `[${currentAuthor}] ${currentTitle} 第${valA}-${valB}巻`;
+                displayText = `${currentTitle} 第${valA}-${valB}巻`;
             } else if (valA) {
-                displayText = `[${currentAuthor}] ${currentTitle} 全${valA}巻`;
+                displayText = `${currentTitle} 全${valA}巻`;
             }
-            copyTextSpan.textContent = displayText;
+            copyTextDisplay.textContent = displayText;
         };
+        
+        const toggleSearchClearBtn = () => { clearSearchBtn.style.display = mangaTitleInput.value ? 'block' : 'none'; };
+        const toggleVolumesClearBtn = () => { clearVolumesBtn.style.display = (volumeA_Input.value || volumeB_Input.value) ? 'block' : 'none'; };
+        const closeLightbox = () => { lightbox.style.display = 'none'; };
 
         const searchCovers = async () => {
             currentTitle = mangaTitleInput.value.trim();
@@ -99,20 +172,16 @@
                 resultGrid.innerHTML = ''; 
 
                 if (data.totalItems > 0 && data.items?.length > 0) {
-                    data.items.sort((a, b) => {
-                        const volA = extractVolumeNumber(a.volumeInfo.title);
-                        const volB = extractVolumeNumber(b.volumeInfo.title);
-                        return volA - volB;
-                    });
-                    
-                    const firstItem = data.items[0];
-                    currentAuthor = firstItem.volumeInfo?.authors?.[0] || '';
-                    if (currentAuthor) {
-                        updateCopyText();
-                        copyArea.style.display = 'block'; 
+                    const bestAuthor = findBestAuthor(data.items);
+                    data.items.sort((a, b) => extractVolumeNumber(a.volumeInfo.title) - extractVolumeNumber(b.volumeInfo.title));
+
+                    if (bestAuthor) {
+                        authorInput.value = bestAuthor;
+                        updateCopyTextDisplay();
+                        copyArea.style.display = 'block';
                     }
                     
-                    // --- ★★★ ここが抜けていました ★★★ ---
+                    // ★★★ ここが抜けていた画像表示の処理 ★★★
                     const uniqueCovers = new Map();
                     data.items.forEach(item => {
                         if (item.volumeInfo.imageLinks?.thumbnail) {
@@ -125,14 +194,13 @@
                             }
                         }
                     });
-
                     uniqueCovers.forEach(book => {
                         const coverDiv = document.createElement('div');
                         coverDiv.className = 'cover-item';
                         coverDiv.innerHTML = `<img src="${book.imageUrl}" alt="${book.title}">`;
                         resultGrid.appendChild(coverDiv);
                     });
-                    // --- ★★★ ここまで ★★★ ---
+                    // ★★★ ここまで ★★★
 
                 } else {
                     resultGrid.innerHTML = '<div class="error">作品が見つかりませんでした。</div>';
@@ -143,18 +211,43 @@
             }
         };
 
+        // --- イベントリスナー ---
         searchButton.addEventListener('click', searchCovers);
         mangaTitleInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCovers(); });
-        volumeA_Input.addEventListener('input', updateCopyText);
-        volumeB_Input.addEventListener('input', updateCopyText);
+        mangaTitleInput.addEventListener('input', toggleSearchClearBtn);
+        
+        volumeA_Input.addEventListener('input', () => { updateCopyTextDisplay(); toggleVolumesClearBtn(); });
+        volumeB_Input.addEventListener('input', () => { updateCopyTextDisplay(); toggleVolumesClearBtn(); });
 
         copyButton.addEventListener('click', () => {
-            navigator.clipboard.writeText(copyTextSpan.textContent).then(() => {
+            const author = authorInput.value;
+            const title = currentTitle;
+            const valA = volumeA_Input.value;
+            const valB = volumeB_Input.value;
+            let textToCopy = `[${author}] ${title}`;
+            if (valA && valB) { textToCopy = `[${author}] ${title} 第${valA}-${valB}巻`; }
+            else if (valA) { textToCopy = `[${author}] ${title} 全${valA}巻`; }
+            navigator.clipboard.writeText(textToCopy).then(() => {
                 copyButton.textContent = 'コピー完了！';
                 setTimeout(() => { copyButton.textContent = 'コピー'; }, 1500);
             });
         });
         
+        clearSearchBtn.addEventListener('click', () => {
+            mangaTitleInput.value = '';
+            resultGrid.innerHTML = '';
+            copyArea.style.display = 'none';
+            toggleSearchClearBtn();
+            mangaTitleInput.focus();
+        });
+
+        clearVolumesBtn.addEventListener('click', () => {
+            volumeA_Input.value = '';
+            volumeB_Input.value = '';
+            updateCopyTextDisplay();
+            toggleVolumesClearBtn();
+        });
+
         resultGrid.addEventListener('click', (e) => {
             if (e.target.tagName === 'IMG') {
                 const highResUrl = e.target.src.replace(/&zoom=\d+/, '&zoom=0');
@@ -162,8 +255,7 @@
                 lightbox.style.display = 'flex';
             }
         });
-
-        const closeLightbox = () => { lightbox.style.display = 'none'; };
+        
         closeButton.addEventListener('click', closeLightbox);
         lightbox.addEventListener('click', (e) => { if (e.target === lightbox) { closeLightbox(); } });
     </script>
