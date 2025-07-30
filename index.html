@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漫画表紙検索</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 2em auto; padding: 0 1em; }
+        input[type="text"] { width: 70%; padding: 0.8em; font-size: 1em; }
+        button { padding: 0.8em; font-size: 1em; }
+        #result { margin-top: 2em; text-align: center; }
+        img { max-width: 250px; border: 1px solid #ccc; }
+        .loading, .error { font-size: 1.2em; color: #555; }
+    </style>
+</head>
+<body>
+    <h1>漫画表紙検索ツール</h1>
+    <input type="text" id="mangaTitle" placeholder="漫画のタイトルを入力">
+    <button id="searchButton">検索</button>
+    <div id="result"></div>
+
+    <script>
+        const searchButton = document.getElementById('searchButton');
+        const mangaTitleInput = document.getElementById('mangaTitle');
+        const resultDiv = document.getElementById('result');
+
+        const searchCover = async () => {
+            const title = mangaTitleInput.value.trim();
+            if (!title) {
+                alert('タイトルを入力してください。');
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">検索中...</div>';
+
+            // Google Books APIのエンドポイント
+            // 検索クエリに「1巻」を加えて、1巻のヒット率を上げる
+            const encodedTitle = encodeURIComponent(title);
+            const url = `https://www.googleapis.com/books/v1/volumes?q=${encodedTitle}+1巻&langRestrict=ja&printType=books`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.totalItems > 0 && data.items[0].volumeInfo.imageLinks) {
+                    // 最初にヒットした書籍のサムネイル画像を取得
+                    const imageUrl = data.items[0].volumeInfo.imageLinks.thumbnail.replace('http://', 'https://');
+                    
+                    resultDiv.innerHTML = `
+                        <a href="${data.items[0].volumeInfo.infoLink}" target="_blank">
+                            <img src="${imageUrl}" alt="${title} 1巻">
+                        </a>
+                    `;
+                } else {
+                    resultDiv.innerHTML = '<div class="error">1巻の表紙が見つかりませんでした。</div>';
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                resultDiv.innerHTML = '<div class="error">検索中にエラーが発生しました。</div>';
+            }
+        };
+
+        searchButton.addEventListener('click', searchCover);
+        mangaTitleInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchCover();
+            }
+        });
+    </script>
+</body>
+</html>
