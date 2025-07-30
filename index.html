@@ -35,14 +35,14 @@
 <body>
     <h1>漫画表紙 全巻検索</h1>
     <div class="input-wrapper" id="search-wrapper">
-        <input type="text" id="mangaTitle" placeholder="漫画のタイトルを入力">
+    <input type="text" id="mangaTitle" placeholder="漫画のタイトルを入力" lang="ja">    
         <span class="clear-btn" id="clear-search">&times;</span>
         <button id="searchButton">検索</button>
     </div>
     <div id="result-area">
         <div id="copy-preview">
             <span id="preview-text"></span>
-            <button id="copy-button">コピー</button>
+            <button id="copy-button">📋</button>
         </div>
         <details id="edit-controls">
             <summary>作者・タイトル・巻数を編集</summary>
@@ -50,12 +50,12 @@
                 <div class="control-group">
                     <label for="author-input">作者名</label>
                     <input type="text" id="author-input">
-                    <button class="copy-part-btn" data-target="author-input">コピー</button>
+                    <button class="copy-part-btn" data-target="author-input">📋</button>
                 </div>
                 <div class="control-group">
                     <label for="title-input">タイトル</label>
                     <input type="text" id="title-input">
-                    <button class="copy-part-btn" data-target="title-input">コピー</button>
+                    <button class="copy-part-btn" data-target="title-input">📋</button>
                 </div>
                 <div class="control-group">
                     <label for="volumeA-input">巻数</label>
@@ -218,18 +218,18 @@
         });
         copyButton.addEventListener('click', () => {
             navigator.clipboard.writeText(generateFinalString()).then(() => {
-                copyButton.textContent = '完了!';
-                setTimeout(() => { copyButton.textContent = 'コピー'; }, 1500);
+                copyButton.textContent = '✅'; // チェックマークに変更
+                setTimeout(() => { copyButton.textContent = '📋'; }, 1500); // アイコンに戻す
             });
         });
+
         document.querySelectorAll('.copy-part-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const targetId = e.target.dataset.target;
                 const targetInput = document.getElementById(targetId);
                 navigator.clipboard.writeText(targetInput.value).then(() => {
-                    const originalText = e.target.textContent;
-                    e.target.textContent = '完了!';
-                    setTimeout(() => { e.target.textContent = originalText; }, 1500);
+                    e.target.textContent = '✅'; // チェックマークに変更
+                    setTimeout(() => { e.target.textContent = '📋'; }, 1500); // アイコンに戻す
                 });
             });
         });
@@ -252,6 +252,12 @@
         });
         closeButton.addEventListener('click', closeLightbox);
         lightbox.addEventListener('click', (e) => { if (e.target === lightbox || e.target === lightboxImg) { closeLightbox(); } });
+        volumeA_Input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // デフォルトの動作をキャンセル
+                volumeB_Input.focus(); // Bのボックスにフォーカスを移動
+            }
+        });
     </script>
 </body>
 </html>
