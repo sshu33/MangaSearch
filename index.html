@@ -135,7 +135,7 @@
         </div>
 
         <details id="edit-controls" open>
-            <summary>作者・タイトル・巻数を編集</summary>
+            <summary>  作者・タイトル・巻数を編集</summary>
             <fieldset>
                 <div class="control-group">
                     <label for="author-input">作者名</label>
@@ -259,10 +259,9 @@
         // --- 3. Google/Wiki Helper Logic ---
         const searchWikipedia = async (title) => {
             wikiStatusSpan.innerHTML = '';
-            
-            // ★修正: 検索ワードに作者も含める (入力欄から取得)
+           
             const author = authorInput.value;
-            const searchQuery = `${title} 漫画 ${author} 何巻まで`;
+            const searchQuery = `${title} 漫画 作者 何巻まで`;
             const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
             
             // Google Button with Icon
