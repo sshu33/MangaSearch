@@ -253,8 +253,6 @@
                 // Parallel Execution: Google Books & Wikipedia
                 const googlePromise = fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40`)
                     .then(res => res.json());
-                
-                const wikiPromise = searchWikipedia(userInput); // Starts running in background
 
                 const data = await googlePromise;
                 
@@ -262,6 +260,8 @@
                 if (data.totalItems > 0 && data.items?.length > 0) {
                     const bestAuthor = findBestAuthor(data.items);
                     const bestTitle = findBestTitle(data.items, userInput);
+                    
+                    searchWikipedia(bestTitle); 
                     
                     authorInput.value = bestAuthor;
                     titleInput.value = bestTitle;
