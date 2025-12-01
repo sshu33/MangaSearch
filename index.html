@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>漫画表紙 全巻検索 v2.1</title>
+    <title>漫画表紙 全巻検索 v2.2</title>
     <style>
         body { font-family: sans-serif; max-width: 960px; margin: 1em auto; padding: 0 1em; }
         * { box-sizing: border-box; }
@@ -27,9 +27,14 @@
         #edit-controls summary { font-weight: bold; cursor: pointer; padding: 5px 0; }
         #edit-controls fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
         .control-group { display: flex; align-items: center; gap: 8px; }
-        .control-group label { font-size: 0.9em; min-width: 50px; }
+        
+        /* ★修正: min-widthを50pxから70pxに変更して、入力欄の頭を揃えました */
+        .control-group label { font-size: 0.9em; min-width: 70px; }
+        
         .control-group input { padding: 4px 6px; font-size: 0.9em; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; }
-        .copy-part-btn { font-size: 0.8em; padding: 4px 8px; flex-shrink: 0; background-color: #6c757d; }
+        
+        /* ★修正: コピーボタンの背景色指定を削除し、元の青(ボタン標準)に戻しました */
+        .copy-part-btn { font-size: 0.8em; padding: 4px 8px; flex-shrink: 0; }
         
         /* Volume Input Specifics */
         .volume-group { flex-wrap: wrap; } 
@@ -83,7 +88,8 @@
             <button id="copy-button">Copy</button>
         </div>
 
-        <details id="edit-controls" open> <summary>▼ 作者・タイトル・巻数を編集</summary>
+        <details id="edit-controls" open>
+            <summary>作者・タイトル・巻数を編集</summary>
             <fieldset>
                 <div class="control-group">
                     <label for="author-input">作者名</label>
@@ -200,20 +206,18 @@
         const searchWikipedia = async (title) => {
             wikiStatusSpan.innerHTML = '';
             
-            // Link is now Google Search
+            // 修正: Google検索ワードを強化
             const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(title + ' 漫画 何巻まで')}`;
             const googleBtnHtml = `<a href="${googleSearchUrl}" target="_blank" class="google-btn">Google ↗</a>`;
 
             try {
-                // Show Google button immediately
                 wikiStatusSpan.innerHTML = googleBtnHtml;
 
-                // Try to find Wiki info in background (optional bonus)
                 const searchUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(title)}&format=json&origin=*`;
                 const searchRes = await fetch(searchUrl);
                 const searchData = await searchRes.json();
                 
-                if (!searchData.query.search.length) return; // Keep just Google button
+                if (!searchData.query.search.length) return;
 
                 const bestPage = searchData.query.search[0];
                 const pageId = bestPage.pageid;
@@ -238,13 +242,11 @@
                     }
                 }
                 
-                // If badge exists, prepend it. Otherwise leave button as is.
                 if (badgeHtml) {
                     wikiStatusSpan.innerHTML = badgeHtml + googleBtnHtml;
                 }
 
             } catch (e) {
-                // Silently fail, leaving the Google button visible
                 console.log("Wiki info fetch failed, keeping Google button.");
             }
         };
@@ -256,7 +258,7 @@
             
             resultGrid.innerHTML = '<div class="loading">検索中...</div>';
             resultArea.style.display = 'none';
-            wikiStatusSpan.innerHTML = ''; // Reset status
+            wikiStatusSpan.innerHTML = ''; 
 
             try {
                 const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40`;
@@ -274,7 +276,7 @@
                     volumeB_Input.value = '';
                     updatePreview();
                     
-                    // ★ Relay Logic: Start Wiki/Google search with the CORRECT title
+                    // リレー方式でWiki検索開始
                     searchWikipedia(bestTitle);
 
                     resultArea.style.display = 'flex';
