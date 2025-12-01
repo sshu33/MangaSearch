@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>漫画表紙 全巻検索 v2</title>
+    <title>漫画表紙 全巻検索 v2.1</title>
     <style>
         body { font-family: sans-serif; max-width: 960px; margin: 1em auto; padding: 0 1em; }
         * { box-sizing: border-box; }
@@ -32,15 +32,27 @@
         .copy-part-btn { font-size: 0.8em; padding: 4px 8px; flex-shrink: 0; background-color: #6c757d; }
         
         /* Volume Input Specifics */
-        .volume-group { flex-wrap: wrap; } /* Allows wiki info to wrap on small screens */
+        .volume-group { flex-wrap: wrap; } 
         #volumeA-input, #volumeB-input { width: 60px; text-align: center; flex-grow: 0; }
         
-        /* Wiki Status Badge */
+        /* Wiki/Google Status Badge */
         #wiki-status { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 0.85em; }
         .wiki-badge { padding: 3px 8px; border-radius: 4px; border: 1px solid; display: inline-flex; align-items: center; gap: 4px; font-weight: bold; }
         .wiki-completed { background-color: #e6fffa; color: #006d5b; border-color: #006d5b; }
         .wiki-ongoing { background-color: #fff8e6; color: #b76e00; border-color: #b76e00; }
-        .wiki-btn { text-decoration: none; background: #f0f0f0; color: #333; padding: 3px 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9em; display: inline-block; }
+        
+        /* Google Search Button Style */
+        .google-btn { 
+            text-decoration: none; 
+            background: #4285f4; /* Google Blue */
+            color: white; 
+            padding: 4px 10px; 
+            border-radius: 4px; 
+            font-size: 0.9em; 
+            display: inline-block;
+            font-weight: bold;
+        }
+        .google-btn:hover { opacity: 0.9; }
         
         /* Grid */
         #result-grid { margin-top: 1.5em; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px; }
@@ -184,58 +196,56 @@
             return match ? parseInt(match[1].replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)), 10) : Infinity;
         };
 
-        // --- 3. Wikipedia Logic (Hybrid) ---
+        // --- 3. Google/Wiki Helper Logic ---
         const searchWikipedia = async (title) => {
-            wikiStatusSpan.innerHTML = '<span style="color:#999; font-size:0.8em;">wiki検索中...</span>';
+            wikiStatusSpan.innerHTML = '';
+            
+            // Link is now Google Search
+            const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(title + ' 漫画')}`;
+            const googleBtnHtml = `<a href="${googleSearchUrl}" target="_blank" class="google-btn">Google ↗</a>`;
+
             try {
-                // 1. Search for the page
+                // Show Google button immediately
+                wikiStatusSpan.innerHTML = googleBtnHtml;
+
+                // Try to find Wiki info in background (optional bonus)
                 const searchUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(title)}&format=json&origin=*`;
                 const searchRes = await fetch(searchUrl);
                 const searchData = await searchRes.json();
                 
-                if (!searchData.query.search.length) {
-                    wikiStatusSpan.innerHTML = '';
-                    return;
-                }
+                if (!searchData.query.search.length) return; // Keep just Google button
 
                 const bestPage = searchData.query.search[0];
                 const pageId = bestPage.pageid;
-                const pageUrl = `https://ja.wikipedia.org/wiki/?curid=${pageId}`;
 
-                // 2. Fetch content (Wikitext) to parse infobox
                 const parseUrl = `https://ja.wikipedia.org/w/api.php?action=parse&pageid=${pageId}&prop=wikitext&format=json&origin=*`;
                 const parseRes = await fetch(parseUrl);
                 const parseData = await parseRes.json();
                 const wikitext = parseData.parse.wikitext['*'];
 
-                // 3. Regex Parsing (Dirty but effective)
-                // Look for "巻数 = " or "既刊 = "
                 const volMatch = wikitext.match(/\|(?:巻数|既刊)\s*=\s*(.*?)(?:\n|\||<br)/);
                 const rawVol = volMatch ? volMatch[1].trim() : "";
                 
-                // Heuristics
-                let statusHtml = `<a href="${pageUrl}" target="_blank" class="wiki-btn">Wiki ↗</a>`; // Default: Just button
-                
+                let badgeHtml = '';
                 if (rawVol) {
-                    const cleanVol = rawVol.replace(/\[\[|\]\]/g, '').replace(/<ref.*?>.*?<\/ref>/g, ''); // Remove links and refs
-                    
+                    const cleanVol = rawVol.replace(/\[\[|\]\]/g, '').replace(/<ref.*?>.*?<\/ref>/g, '');
                     if (cleanVol.match(/全|完|End/)) {
-                        // Completed
-                        statusHtml = `<span class="wiki-badge wiki-completed">✅ ${cleanVol}</span> <a href="${pageUrl}" target="_blank" class="wiki-btn">↗</a>`;
+                        badgeHtml = `<span class="wiki-badge wiki-completed">✅ ${cleanVol}</span> `;
                     } else if (cleanVol.match(/既刊|連載|現在/)) {
-                        // Ongoing
-                        statusHtml = `<span class="wiki-badge wiki-ongoing">▶ ${cleanVol}</span> <a href="${pageUrl}" target="_blank" class="wiki-btn">↗</a>`;
+                        badgeHtml = `<span class="wiki-badge wiki-ongoing">▶ ${cleanVol}</span> `;
                     } else if (/\d/.test(cleanVol)) {
-                        // Just numbers found, assume ongoing unless proved otherwise, but show carefully
-                        statusHtml = `<span class="wiki-badge wiki-ongoing">? ${cleanVol}</span> <a href="${pageUrl}" target="_blank" class="wiki-btn">↗</a>`;
+                        badgeHtml = `<span class="wiki-badge wiki-ongoing">? ${cleanVol}</span> `;
                     }
                 }
-
-                wikiStatusSpan.innerHTML = statusHtml;
+                
+                // If badge exists, prepend it. Otherwise leave button as is.
+                if (badgeHtml) {
+                    wikiStatusSpan.innerHTML = badgeHtml + googleBtnHtml;
+                }
 
             } catch (e) {
-                console.error("Wiki Error", e);
-                wikiStatusSpan.innerHTML = ''; // Fail silently
+                // Silently fail, leaving the Google button visible
+                console.log("Wiki info fetch failed, keeping Google button.");
             }
         };
 
@@ -244,24 +254,19 @@
             const userInput = mangaTitleInput.value.trim();
             if (!userInput) return;
             
-            // UI Reset
             resultGrid.innerHTML = '<div class="loading">検索中...</div>';
             resultArea.style.display = 'none';
-            wikiStatusSpan.innerHTML = ''; // Reset Wiki status
+            wikiStatusSpan.innerHTML = ''; // Reset status
 
             try {
-                // Parallel Execution: Google Books & Wikipedia
-                const googlePromise = fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40`)
-                    .then(res => res.json());
-
-                const data = await googlePromise;
+                const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40`;
+                const response = await fetch(url);
+                const data = await response.json();
                 
                 resultGrid.innerHTML = '';
                 if (data.totalItems > 0 && data.items?.length > 0) {
                     const bestAuthor = findBestAuthor(data.items);
                     const bestTitle = findBestTitle(data.items, userInput);
-                    
-                    searchWikipedia(bestTitle); 
                     
                     authorInput.value = bestAuthor;
                     titleInput.value = bestTitle;
@@ -269,9 +274,11 @@
                     volumeB_Input.value = '';
                     updatePreview();
                     
-                    resultArea.style.display = 'flex'; // Show controls
+                    // ★ Relay Logic: Start Wiki/Google search with the CORRECT title
+                    searchWikipedia(bestTitle);
+
+                    resultArea.style.display = 'flex';
                     
-                    // Sort and Unique Logic
                     data.items.sort((a,b) => extractVolumeNumber(a.volumeInfo.title) - extractVolumeNumber(b.volumeInfo.title));
                     const uniqueCovers = new Map();
                     data.items.forEach(item => {
@@ -296,9 +303,6 @@
                 } else {
                     resultGrid.innerHTML = '<div class="error">作品が見つかりませんでした。</div>';
                 }
-                
-                // Wiki logic will finish whenever it finishes, updating the DOM independently.
-
             } catch (error) {
                 console.error(error);
                 resultGrid.innerHTML = '<div class="error">検索中にエラーが発生しました。</div>';
@@ -344,7 +348,6 @@
             });
         });
 
-        // Grid Click -> Lightbox
         resultGrid.addEventListener('click', (e) => {
             if (e.target.tagName === 'IMG') {
                 lightboxImg.src = e.target.src.replace(/&zoom=\d+/, '&zoom=0');
