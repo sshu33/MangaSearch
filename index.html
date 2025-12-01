@@ -64,21 +64,23 @@
         .wiki-completed { background-color: #e6fffa; color: #006d5b; border-color: #006d5b; }
         .wiki-ongoing { background-color: #fff8e6; color: #b76e00; border-color: #b76e00; }
         
-        /* Google Search Button Style */
+     /* Google Search Button Style */
         .google-btn { 
             text-decoration: none; 
-            background: #f0f0f0; 
+            background: #e9ecef;       /* 上の帯と同じ色に変更！ */
             color: #333; 
-            padding: 4px 10px; 
+            padding: 0 12px;
+            height: 36px;
             border-radius: 4px; 
-            border: 1px solid #ccc;
+            border: none;              /* 枠線を削除！ */
             font-size: 0.9em; 
             display: inline-flex;
             align-items: center;
             gap: 4px;
             transition: background 0.2s;
+            vertical-align: middle;
         }
-        .google-btn:hover { background: #e0e0e0; }
+        .google-btn:hover { background: #dde2e6; } /* ホバー時に少し濃く */
 
         /* ★修正: アイコンボタンのデザイン */
         .icon-btn {
