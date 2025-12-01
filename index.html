@@ -3,16 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>漫画表紙 全巻検索 v2.2</title>
+    <title>漫画表紙 全巻検索 v2.3</title>
     <style>
         body { font-family: sans-serif; max-width: 960px; margin: 1em auto; padding: 0 1em; }
         * { box-sizing: border-box; }
         
         /* Input Area */
-        .input-wrapper { display: flex; align-items: center; gap: 8px; position: relative; }
+        .input-wrapper { display: flex; align-items: center; gap: 8px; position: relative; width: 100%; }
         input[type="text"] { flex-grow: 1; padding: 0.8em; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; }
-        button { padding: 0.8em; font-size: 1em; border: none; background-color: #007bff; color: white; border-radius: 5px; cursor: pointer; flex-shrink: 0; }
+        
+        /* Search Button */
+        button#searchButton { 
+            padding: 0.8em 1.2em; 
+            font-size: 1em; 
+            border: none; 
+            background-color: #007bff; 
+            color: white; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            flex-shrink: 0; 
+            font-weight: bold;
+        }
         button:hover { opacity: 0.9; }
+        
         .clear-btn { position: absolute; right: 90px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 1.5em; color: #999; display: none; line-height: 1; }
         
         /* Result Area */
@@ -20,21 +33,26 @@
         
         /* Copy Preview Box */
         #copy-preview { display: flex; align-items: center; gap: 10px; background-color: #e9ecef; padding: 10px; border-radius: 8px; }
-        #preview-text { flex-grow: 1; font-family: monospace; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #copy-button { font-size: 0.9em; padding: 0.6em; }
+        #preview-text { flex-grow: 1; font-family: monospace; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #333; }
         
         /* Edit Controls */
-        #edit-controls summary { font-weight: bold; cursor: pointer; padding: 5px 0; }
-        #edit-controls fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+        #edit-controls summary { font-weight: bold; cursor: pointer; padding: 5px 0; outline: none; }
+        
+        /* ★修正: margin:0 で横幅のズレを解消しました */
+        #edit-controls fieldset { 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            padding: 10px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            margin: 0; 
+            width: 100%;
+        }
+        
         .control-group { display: flex; align-items: center; gap: 8px; }
-        
-        /* ★修正: min-widthを50pxから70pxに変更して、入力欄の頭を揃えました */
-        .control-group label { font-size: 0.9em; min-width: 70px; }
-        
-        .control-group input { padding: 4px 6px; font-size: 0.9em; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; }
-        
-        /* ★修正: コピーボタンの背景色指定を削除し、元の青(ボタン標準)に戻しました */
-        .copy-part-btn { font-size: 0.8em; padding: 4px 8px; flex-shrink: 0; }
+        .control-group label { font-size: 0.9em; min-width: 70px; font-weight: bold; color: #555; }
+        .control-group input { padding: 6px 8px; font-size: 0.9em; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; }
         
         /* Volume Input Specifics */
         .volume-group { flex-wrap: wrap; } 
@@ -55,10 +73,37 @@
             border-radius: 4px; 
             border: 1px solid #ccc;
             font-size: 0.9em; 
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: background 0.2s;
         }
         .google-btn:hover { background: #e0e0e0; }
+
+        /* ★修正: アイコンボタンのデザイン */
+        .icon-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            color: #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, color 0.2s;
+        }
+        .icon-btn:hover { background-color: #e2e6ea; color: #007bff; }
+        .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
         
+        /* Blue Copy Button for Main Result */
+        #copy-button {
+            background-color: #007bff;
+            color: white;
+            padding: 8px;
+        }
+        #copy-button:hover { background-color: #0056b3; color: white; }
+
         /* Grid */
         #result-grid { margin-top: 1.5em; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px; }
         .cover-item img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
@@ -85,7 +130,9 @@
     <div id="result-area">
         <div id="copy-preview">
             <span id="preview-text"></span>
-            <button id="copy-button">Copy</button>
+            <button id="copy-button" class="icon-btn" title="コピー">
+                <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            </button>
         </div>
 
         <details id="edit-controls" open>
@@ -94,12 +141,16 @@
                 <div class="control-group">
                     <label for="author-input">作者名</label>
                     <input type="text" id="author-input">
-                    <button class="copy-part-btn" data-target="author-input">Copy</button>
+                    <button class="icon-btn copy-part-btn" data-target="author-input" title="コピー">
+                        <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    </button>
                 </div>
                 <div class="control-group">
                     <label for="title-input">タイトル</label>
                     <input type="text" id="title-input">
-                    <button class="copy-part-btn" data-target="title-input">Copy</button>
+                    <button class="icon-btn copy-part-btn" data-target="title-input" title="コピー">
+                        <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    </button>
                 </div>
                 <div class="control-group volume-group">
                     <label for="volumeA-input">巻数</label>
@@ -144,6 +195,10 @@
         const filenameText = document.getElementById('filename-text');
         const filenameCopyBtn = document.getElementById('filename-copy-btn');
         const wikiStatusSpan = document.getElementById('wiki-status');
+
+        // Icons
+        const ICON_COPY = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+        const ICON_CHECK = '<svg viewBox="0 0 24 24" style="fill:#28a745"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
 
         // --- 2. Helper Functions ---
         const generateFinalString = () => {
@@ -206,9 +261,13 @@
         const searchWikipedia = async (title) => {
             wikiStatusSpan.innerHTML = '';
             
-            // 修正: Google検索ワードを強化
-            const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(title + ' 漫画 作者 何巻まで')}`;
-            const googleBtnHtml = `<a href="${googleSearchUrl}" target="_blank" class="google-btn">Google ↗</a>`;
+            // ★修正: 検索ワードに作者も含める (入力欄から取得)
+            const author = authorInput.value;
+            const searchQuery = `${title} 漫画 ${author} 何巻まで`;
+            const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+            
+            // Google Button with Icon
+            const googleBtnHtml = `<a href="${googleSearchUrl}" target="_blank" class="google-btn"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg> Google ↗</a>`;
 
             try {
                 wikiStatusSpan.innerHTML = googleBtnHtml;
@@ -276,8 +335,7 @@
                     volumeB_Input.value = '';
                     updatePreview();
                     
-                    // リレー方式でWiki検索開始
-                    searchWikipedia(bestTitle);
+                    searchWikipedia(bestTitle); // Pass title, function reads author from input
 
                     resultArea.style.display = 'flex';
                     
@@ -331,12 +389,15 @@
             mangaTitleInput.focus();
         });
 
-        // Clipboard Copy
+        // Clipboard Copy with Icon Feedback
         const copyToClipboard = (text, btnElement) => {
             navigator.clipboard.writeText(text).then(() => {
-                const originalText = btnElement.textContent;
-                btnElement.textContent = 'OK';
-                setTimeout(() => { btnElement.textContent = originalText; }, 1500);
+                // Change icon to checkmark
+                btnElement.innerHTML = ICON_CHECK;
+                setTimeout(() => { 
+                    // Revert to original icon
+                    btnElement.innerHTML = ICON_COPY; 
+                }, 1500);
             });
         };
 
@@ -344,9 +405,9 @@
         
         document.querySelectorAll('.copy-part-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const targetId = e.target.dataset.target;
+                const targetId = e.currentTarget.dataset.target; // Use currentTarget for button with SVG
                 const targetInput = document.getElementById(targetId);
-                copyToClipboard(targetInput.value, e.target);
+                copyToClipboard(targetInput.value, e.currentTarget);
             });
         });
 
