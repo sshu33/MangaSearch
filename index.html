@@ -175,83 +175,268 @@
     </div>
 
     <script>
-        // --- 診断用ロジック ---
+        // --- 1. DOM Elements ---
         const mangaTitleInput = document.getElementById('mangaTitle');
         const searchButton = document.getElementById('searchButton');
-        const resultGrid = document.getElementById('result-grid');
+        const clearSearchBtn = document.getElementById('clear-search');
         const resultArea = document.getElementById('result-area');
-        
-        // 画面にログを出す関数
-        const log = (msg, color = 'black') => {
-            const div = document.createElement('div');
-            div.style.padding = '5px';
-            div.style.borderBottom = '1px solid #ccc';
-            div.style.color = color;
-            div.textContent = `[診断] ${msg}`;
-            resultGrid.appendChild(div);
+        const previewText = document.getElementById('preview-text');
+        const copyButton = document.getElementById('copy-button');
+        const authorInput = document.getElementById('author-input');
+        const titleInput = document.getElementById('title-input');
+        const volumeA_Input = document.getElementById('volumeA-input');
+        const volumeB_Input = document.getElementById('volumeB-input');
+        const resultGrid = document.getElementById('result-grid');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        const closeButton = document.getElementById('close-button');
+        const filenameArea = document.getElementById('filename-area');
+        const filenameText = document.getElementById('filename-text');
+        const filenameCopyBtn = document.getElementById('filename-copy-btn');
+        const wikiStatusSpan = document.getElementById('wiki-status');
+
+        // Icons
+        const ICON_COPY = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+        const ICON_CHECK = '<svg viewBox="0 0 24 24" style="fill:#28a745"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+
+        // --- 2. Helper Functions ---
+        const generateFinalString = () => {
+            const author = authorInput.value;
+            const title = titleInput.value;
+            const valA = volumeA_Input.value;
+            const valB = volumeB_Input.value;
+            let finalString = `[${author}] ${title}`;
+            if (valA && valB) { finalString = `[${author}] ${title} 第${valA}-${valB}巻`; }
+            else if (valA) { finalString = `[${author}] ${title} 全${valA}巻`; }
+            return finalString;
         };
 
-        const searchCovers = async () => {
-            const userInput = mangaTitleInput.value.trim();
-            if (!userInput) return;
+        const updatePreview = () => {
+            previewText.textContent = generateFinalString();
+        };
 
-            // 初期化
-            resultGrid.innerHTML = '';
-            resultArea.style.display = 'flex'; // 強制的に表示
+        const findBestAuthor = (items) => {
+            const authorCounts = new Map();
+            items.slice(0, 10).forEach(item => {
+                if (item.volumeInfo?.authors) {
+                    item.volumeInfo.authors.forEach(author => authorCounts.set(author, (authorCounts.get(author) || 0) + 1));
+                }
+            });
+            if (authorCounts.size === 0) return '';
+            let maxCount = 0, bestAuthors = [];
+            for (const [author, count] of authorCounts.entries()) {
+                if (count > maxCount) { maxCount = count; bestAuthors = [author]; }
+                else if (count === maxCount) { bestAuthors.push(author); }
+            }
+            if (bestAuthors.length === 1) return bestAuthors[0];
+            return bestAuthors.find(author => /[一-龠ぁ-んァ-ヶ]/.test(author)) || bestAuthors[0];
+        };
+
+        const findBestTitle = (items, userInput) => {
+            const titleCounts = new Map();
+            items.slice(0, 10).forEach(item => {
+                if (item.volumeInfo?.title) {
+                    const baseTitle = item.volumeInfo.title.replace(/(, Vol\. \d+| \d+| 第\d+巻|（[0-9０-９]+）|\([0-9０-９]+\)|\(通常版\)).*/, '').trim();
+                    if (baseTitle && baseTitle.toLowerCase().includes(userInput.toLowerCase())) {
+                        titleCounts.set(baseTitle, (titleCounts.get(baseTitle) || 0) + 1);
+                    }
+                }
+            });
+            if (titleCounts.size === 0) return userInput;
+            let bestTitle = userInput, maxCount = 0;
+            for (const [title, count] of titleCounts.entries()) {
+                if (count > maxCount) { maxCount = count; bestTitle = title; }
+            }
+            return bestTitle;
+        };
+
+        const extractVolumeNumber = (title) => {
+            if (!title) return Infinity;
+            const match = title.match(/(?:[ (\[第#]|\bVol\.\s?)([0-9０-９]+)/);
+            return match ? parseInt(match[1].replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)), 10) : Infinity;
+        };
+
+        // --- 3. Google/Wiki Helper Logic ---
+        const searchWikipedia = async (title) => {
+            wikiStatusSpan.innerHTML = '';
+           
+            const author = authorInput.value;
+            const searchQuery = `${title} 漫画 作者 何巻まで`;
+            const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
             
-            log('処理を開始します...', 'blue');
-            
+            // Google Button with Icon
+            const googleBtnHtml = `<a href="${googleSearchUrl}" target="_blank" class="google-btn">Google ↗</a>`;
+
             try {
-                // 1. URLの確認
-                const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40`;
-                log('通信URL生成完了');
+                wikiStatusSpan.innerHTML = googleBtnHtml;
 
-                // 2. Fetch開始
-                log('Googleへ通信中...', 'blue');
-                const response = await fetch(url);
+                const searchUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(title)}&format=json&origin=*`;
+                const searchRes = await fetch(searchUrl);
+                const searchData = await searchRes.json();
                 
-                // 3. ステータス確認
-                log(`通信完了。ステータスコード: ${response.status}`);
+                if (!searchData.query.search.length) return;
+
+                const bestPage = searchData.query.search[0];
+                const pageId = bestPage.pageid;
+
+                const parseUrl = `https://ja.wikipedia.org/w/api.php?action=parse&pageid=${pageId}&prop=wikitext&format=json&origin=*`;
+                const parseRes = await fetch(parseUrl);
+                const parseData = await parseRes.json();
+                const wikitext = parseData.parse.wikitext['*'];
+
+                const volMatch = wikitext.match(/\|(?:巻数|既刊)\s*=\s*(.*?)(?:\n|\||<br)/);
+                const rawVol = volMatch ? volMatch[1].trim() : "";
                 
-                if (!response.ok) {
-                    log(`エラー発生: サーバーが ${response.status} を返しました`, 'red');
-                    if (response.status === 429) log('→ 使いすぎ（制限）です。時間を空けてください。', 'red');
-                    if (response.status === 403) log('→ APIキーがないため拒否されました。', 'red');
-                    return;
+                let badgeHtml = '';
+                if (rawVol) {
+                    const cleanVol = rawVol.replace(/\[\[|\]\]/g, '').replace(/<ref.*?>.*?<\/ref>/g, '');
+                    if (cleanVol.match(/全|完|End/)) {
+                        badgeHtml = `<span class="wiki-badge wiki-completed">✅ ${cleanVol}</span> `;
+                    } else if (cleanVol.match(/既刊|連載|現在/)) {
+                        badgeHtml = `<span class="wiki-badge wiki-ongoing">▶ ${cleanVol}</span> `;
+                    } else if (/\d/.test(cleanVol)) {
+                        badgeHtml = `<span class="wiki-badge wiki-ongoing">? ${cleanVol}</span> `;
+                    }
+                }
+                
+                if (badgeHtml) {
+                    wikiStatusSpan.innerHTML = badgeHtml + googleBtnHtml;
                 }
 
-                // 4. データ変換
-                const data = await response.json();
-                log(`データ取得成功。ヒット数: ${data.totalItems}件`);
-
-                // 5. 件数チェック
-                if (!data.items || data.items.length === 0) {
-                    log('検索結果が0件でした。「intitle:」の制限が厳しすぎる可能性があります。', 'red');
-                    
-                    // 試しにintitleなしのURLを表示
-                    const looseUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(userInput)}&langRestrict=ja&printType=books`;
-                    log('▼対策: intitleを外して試しますか？', 'green');
-                } else {
-                    log(`画像を表示します（${data.items.length}枚）`, 'green');
-                    // ここで画像表示処理（省略せず簡易表示）
-                    data.items.forEach(item => {
-                        if(item.volumeInfo.imageLinks?.thumbnail){
-                            const img = document.createElement('img');
-                            img.src = item.volumeInfo.imageLinks.thumbnail;
-                            img.style.width = '100px';
-                            img.style.margin = '5px';
-                            resultGrid.appendChild(img);
-                        }
-                    });
-                }
-
-            } catch (error) {
-                log(`致命的なエラー: ${error.message}`, 'red');
-                log('※ Androidでローカルファイルを開いている場合、CORSエラーの可能性があります。', 'red');
+            } catch (e) {
+                console.log("Wiki info fetch failed, keeping Google button.");
             }
         };
 
+        // --- 4. Main Search Logic ---
+        const searchCovers = async () => {
+            const userInput = mangaTitleInput.value.trim();
+            if (!userInput) return;
+            
+            resultGrid.innerHTML = '<div class="loading">検索中...</div>';
+            resultArea.style.display = 'none';
+            wikiStatusSpan.innerHTML = ''; 
+
+            try {
+                const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                resultGrid.innerHTML = '';
+                if (data.totalItems > 0 && data.items?.length > 0) {
+                    const bestAuthor = findBestAuthor(data.items);
+                    const bestTitle = findBestTitle(data.items, userInput);
+                    
+                    authorInput.value = bestAuthor;
+                    titleInput.value = bestTitle;
+                    volumeA_Input.value = '';
+                    volumeB_Input.value = '';
+                    updatePreview();
+                    
+                    searchWikipedia(bestTitle); // Pass title, function reads author from input
+
+                    resultArea.style.display = 'flex';
+                    
+                    data.items.sort((a,b) => extractVolumeNumber(a.volumeInfo.title) - extractVolumeNumber(b.volumeInfo.title));
+                    const uniqueCovers = new Map();
+                    data.items.forEach(item => {
+                        if (item.volumeInfo.imageLinks?.thumbnail) {
+                            const imageUrl = item.volumeInfo.imageLinks.thumbnail.replace('http://', 'https://');
+                            if (!uniqueCovers.has(imageUrl)) {
+                                uniqueCovers.set(imageUrl, { 
+                                    title: item.volumeInfo.title || userInput, 
+                                    imageUrl: imageUrl,
+                                    volume: extractVolumeNumber(item.volumeInfo.title)
+                                });
+                            }
+                        }
+                    });
+
+                    uniqueCovers.forEach(book => {
+                        const coverDiv = document.createElement('div');
+                        coverDiv.className = 'cover-item';
+                        coverDiv.innerHTML = `<img src="${book.imageUrl}" alt="${book.title}" data-volume="${book.volume}">`;
+                        resultGrid.appendChild(coverDiv);
+                    });
+                } else {
+                    resultGrid.innerHTML = '<div class="error">作品が見つかりませんでした。</div>';
+                }
+            } catch (error) {
+                console.error(error);
+                resultGrid.innerHTML = '<div class="error">検索中にエラーが発生しました。</div>';
+            }
+        };
+        
+        const closeLightbox = () => { lightbox.style.display = 'none'; };
+
+        // --- 5. Event Listeners ---
         searchButton.addEventListener('click', searchCovers);
-    </script>
+        mangaTitleInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCovers(); });
+        mangaTitleInput.addEventListener('input', () => { clearSearchBtn.style.display = mangaTitleInput.value ? 'block' : 'none'; });
+        
+        [authorInput, titleInput, volumeA_Input, volumeB_Input].forEach(input => {
+            input.addEventListener('input', updatePreview);
+        });
+        
+        clearSearchBtn.addEventListener('click', () => {
+            mangaTitleInput.value = '';
+            resultGrid.innerHTML = '';
+            resultArea.style.display = 'none';
+            clearSearchBtn.style.display = 'none';
+            wikiStatusSpan.innerHTML = '';
+            mangaTitleInput.focus();
+        });
+
+        // Clipboard Copy with Icon Feedback
+        const copyToClipboard = (text, btnElement) => {
+            navigator.clipboard.writeText(text).then(() => {
+                // Change icon to checkmark
+                btnElement.innerHTML = ICON_CHECK;
+                setTimeout(() => { 
+                    // Revert to original icon
+                    btnElement.innerHTML = ICON_COPY; 
+                }, 1500);
+            });
+        };
+
+        copyButton.addEventListener('click', () => copyToClipboard(generateFinalString(), copyButton));
+        
+        document.querySelectorAll('.copy-part-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetId = e.currentTarget.dataset.target; // Use currentTarget for button with SVG
+                const targetInput = document.getElementById(targetId);
+                copyToClipboard(targetInput.value, e.currentTarget);
+            });
+        });
+
+        resultGrid.addEventListener('click', (e) => {
+            if (e.target.tagName === 'IMG') {
+                lightboxImg.src = e.target.src.replace(/&zoom=\d+/, '&zoom=0');
+                const author = authorInput.value.replace(/\s/g, '_');
+                const title = titleInput.value.replace(/\s/g, '_');
+                const volume = e.target.dataset.volume;
+                const filename = `${author}_${title}_${volume !== 'Infinity' ? 'v' + String(volume).padStart(2, '0') : ''}.jpg`.replace(/__+/g, '_').replace(/^_|_$/g, '');
+                filenameText.textContent = filename;
+                lightbox.style.display = 'flex';
+            }
+        });
+
+        filenameCopyBtn.addEventListener('click', () => {
+             navigator.clipboard.writeText(filenameText.textContent).then(() => {
+                filenameCopyBtn.textContent = '完了!';
+                setTimeout(() => { filenameCopyBtn.textContent = 'コピー'; }, 1500);
+            });
+        });
+
+        closeButton.addEventListener('click', closeLightbox);
+        lightbox.addEventListener('click', (e) => { if (e.target === lightbox || e.target === lightboxImg) { closeLightbox(); } });
+        
+        volumeA_Input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                volumeB_Input.focus();
+            }
+        });
+    </script>    
 </body>
 </html>
