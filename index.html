@@ -312,14 +312,24 @@
         const searchCovers = async () => {
             const userInput = mangaTitleInput.value.trim();
             if (!userInput) return;
+      
+            let apiKey = localStorage.getItem('google_books_key');
+            if (!apiKey) {
+                apiKey = prompt('APIキーを入力してください（端末に保存されます）:');
+                if (apiKey) {
+                    localStorage.setItem('google_books_key', apiKey);
+                } else {
+                    alert('APIキーがないため検索できません。');
+                    return;
+                }
+            }
             
             resultGrid.innerHTML = '<div class="loading">検索中...</div>';
             resultArea.style.display = 'none';
             wikiStatusSpan.innerHTML = ''; 
 
             try {
-                const API_KEY = 'AIzaSyB4ISWZaqWj-8AFWGRmV37rmkbv1PgDBVs'; 
-                const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40&key=${API_KEY}`;
+                const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40&key=${apiKey}`;
                 const response = await fetch(url);
                 const data = await response.json();
                 
