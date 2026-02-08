@@ -362,10 +362,13 @@
                     resultGrid.innerHTML = '<div class="error">作品が見つかりませんでした。</div>';
                 }
             } catch (error) {
-                console.error(error);
-                resultGrid.innerHTML = '<div class="error">検索中にエラーが発生しました。</div>';
+                // エラーの中身をポップアップで表示させる
+                alert("エラー詳細:\n" + error.message);
+                
+                // 画面にも表示させる
+                resultGrid.innerHTML = '<div class="error">' + error.message + '</div>';
             }
-        };
+
         
         const closeLightbox = () => { lightbox.style.display = 'none'; };
 
