@@ -318,7 +318,8 @@
             wikiStatusSpan.innerHTML = ''; 
 
             try {
-                const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40`;
+                const API_KEY = 'AIzaSyB4ISWZaqWj-8AFWGRmV37rmkbv1PgDBVs'; 
+                const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40&key=${API_KEY}`;
                 const response = await fetch(url);
                 const data = await response.json();
                 
