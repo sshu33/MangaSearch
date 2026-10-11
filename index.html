@@ -309,6 +309,21 @@
         };
 
         // --- 4. Main Search Logic ---
+        // Google Books APIの検索（503などの一時的なエラーは自動で再試行）
+        const RETRY_STATUSES = [500, 502, 503, 504];
+        const MAX_RETRIES = 5;
+        const fetchBooks = async (query, apiKey) => {
+            const url = `https://www.googleapis.com/books/v1/volumes?q=${query}&langRestrict=ja&printType=books&maxResults=40&key=${apiKey}`;
+            for (let attempt = 0; ; attempt++) {
+                const response = await fetch(url);
+                const data = await response.json().catch(() => null);
+                if (!RETRY_STATUSES.includes(response.status) || attempt >= MAX_RETRIES) {
+                    return { response, data };
+                }
+                resultGrid.innerHTML = `<div class="loading">検索中...（再試行 ${attempt + 1}/${MAX_RETRIES}）</div>`;
+                await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+            }
+        };        
         const searchCovers = async () => {
             const userInput = mangaTitleInput.value.trim();
             if (!userInput) return;
@@ -329,11 +344,25 @@
             wikiStatusSpan.innerHTML = ''; 
 
             try {
-                const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40&key=${apiKey}`;
-                const response = await fetch(url);
-                const data = await response.json();
-                
+                let { response, data } = await fetchBooks(`intitle:${encodeURIComponent(userInput)}`, apiKey);
+
+                // intitle: で0件だった場合は通常検索でやり直す
+                if (response.ok && data && !data.error && !(data.totalItems > 0 && data.items?.length > 0)) {
+                    ({ response, data } = await fetchBooks(encodeURIComponent(userInput), apiKey));
+                }
+
                 resultGrid.innerHTML = '';
+
+                // APIエラー時は内容を表示して終了（出力文字列には関与しない）
+                if (!response.ok || !data || data.error) {
+                    const code = data?.error?.code ?? response.status;
+                    const message = data?.error?.message || response.statusText || '詳細不明';
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error';
+                    errorDiv.textContent = `APIエラー (${code}): ${message}`;
+                    resultGrid.appendChild(errorDiv);
+                    return;
+                }
                 if (data.totalItems > 0 && data.items?.length > 0) {
                     const bestAuthor = findBestAuthor(data.items);
                     const bestTitle = findBestTitle(data.items, userInput);
