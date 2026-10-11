@@ -3,151 +3,281 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>漫画表紙 全巻検索 v2.3</title>
+    <title>漫画表紙 全巻検索 v3.0</title>
     <style>
-        body { font-family: sans-serif; max-width: 960px; margin: 1em auto; padding: 0 1em; }
+        :root {
+            --primary: #007bff;
+            --primary-dark: #0056b3;
+            --border: #ccc;
+            --muted: #555;
+            --bg-soft: #e9ecef;
+        }
         * { box-sizing: border-box; }
-        
-        /* Input Area */
-        .input-wrapper { display: flex; align-items: center; gap: 8px; position: relative; width: 100%; }
-        input[type="text"] { flex-grow: 1; padding: 0.8em; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; }
-        
-        /* Search Button */
-        button#searchButton { 
-            padding: 0.8em 1.2em; 
-            font-size: 1em; 
-            border: none; 
-            background-color: #007bff; 
-            color: white; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            flex-shrink: 0; 
+        body {
+            font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+            max-width: 960px;
+            margin: 1em auto;
+            padding: 0 1em;
+            color: #222;
+        }
+        h1 { font-size: 1.6em; }
+
+        /* 検索エリア */
+        .search-row { display: flex; align-items: center; gap: 8px; }
+        .search-box { position: relative; flex-grow: 1; }
+        .search-box input {
+            width: 100%;
+            padding: 0.8em 2.4em 0.8em 0.8em;
+            font-size: 1em;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+        }
+        .clear-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0 4px;
+            display: none;
+        }
+        .clear-btn.visible { display: block; }
+        #searchButton {
+            padding: 0.8em 1.2em;
+            font-size: 1em;
+            border: none;
+            background-color: var(--primary);
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            flex-shrink: 0;
             font-weight: bold;
         }
-        button:hover { opacity: 0.9; }
-        
-        .clear-btn { position: absolute; right: 90px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 1.5em; color: #999; display: none; line-height: 1; }
-        
-        /* Result Area */
+        #searchButton:hover { background-color: var(--primary-dark); }
+        #searchButton:disabled { opacity: 0.6; cursor: wait; }
+
+        /* 検索方式の注記 */
+        #search-note {
+            margin: 0.8em 0 0;
+            padding: 8px 12px;
+            font-size: 0.85em;
+            background: #fff8e6;
+            color: #8a5300;
+            border: 1px solid #f0c36d;
+            border-radius: 6px;
+        }
+
+        /* 結果エリア */
         #result-area { display: none; margin-top: 1.5em; flex-direction: column; gap: 1em; }
-        
-        /* Copy Preview Box */
-        #copy-preview { display: flex; align-items: center; gap: 10px; background-color: #e9ecef; padding: 10px; border-radius: 8px; }
-        #preview-text { flex-grow: 1; font-family: monospace; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #333; }
-        
-        /* Edit Controls */
-        #edit-controls summary { font-weight: bold; cursor: pointer; padding: 5px 0; outline: none; }
-        
-        /* ★修正: margin:0 で横幅のズレを解消しました */
-        #edit-controls fieldset { 
-            border: 1px solid #ddd; 
-            border-radius: 8px; 
-            padding: 10px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 10px; 
-            margin: 0; 
+        #result-area.visible { display: flex; }
+
+        /* コピー用プレビュー */
+        #copy-preview {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: var(--bg-soft);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        #preview-text {
+            flex-grow: 1;
+            font-family: monospace;
+            font-size: 0.9em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #333;
+        }
+
+        /* 編集エリア */
+        #edit-controls summary { font-weight: bold; cursor: pointer; padding: 5px 0; }
+        #edit-controls fieldset {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 0;
             width: 100%;
         }
-        
         .control-group { display: flex; align-items: center; gap: 8px; }
-        .control-group label { font-size: 0.9em; min-width: 70px; font-weight: bold; color: #555; }
-        .control-group input { padding: 6px 8px; font-size: 0.9em; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; }
-        
-        /* Volume Input Specifics */
-        .volume-group { flex-wrap: wrap; } 
-        #volumeA-input, #volumeB-input { width: 60px; text-align: center; flex-grow: 0; }
-        
-        /* Wiki/Google Status Badge */
-        #wiki-status { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 0.85em; }
-        .wiki-badge { padding: 3px 8px; border-radius: 4px; border: 1px solid; display: inline-flex; align-items: center; gap: 4px; font-weight: bold; }
+        .control-group label { font-size: 0.9em; min-width: 70px; font-weight: bold; color: var(--muted); }
+        .control-group input {
+            padding: 6px 8px;
+            font-size: 0.9em;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            flex-grow: 1;
+        }
+        .volume-group { flex-wrap: wrap; }
+        #volumeA-input, #volumeB-input { width: 70px; text-align: center; flex-grow: 0; }
+
+        /* Wikipedia / Google 表示 */
+        #wiki-status {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            font-size: 0.85em;
+        }
+        .wiki-badge {
+            font: inherit;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
         .wiki-completed { background-color: #e6fffa; color: #006d5b; border-color: #006d5b; }
         .wiki-ongoing { background-color: #fff8e6; color: #b76e00; border-color: #b76e00; }
-        
-        /* Google Search Button Style  */
-        .google-btn { 
-            text-decoration: none; 
-            background: #e9ecef;       /*  */
-            color: #555; 
-            padding: 7px 12px;         /*  */
-            border-radius: 4px; 
-            border: none;              
-            font-size: 0.9em; 
+        .link-btn {
+            text-decoration: none;
+            background: var(--bg-soft);
+            color: var(--muted);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 0.95em;
             display: inline-block;
             line-height: 1.3;
         }
-        .google-btn:hover { background: #dde2e6; }
+        .link-btn:hover { background: #dde2e6; }
 
-
-        /* ★修正: アイコンボタンのデザイン */
+        /* アイコンボタン */
         .icon-btn {
             background: none;
             border: none;
             cursor: pointer;
             padding: 5px;
             border-radius: 4px;
-            color: #555;
+            color: var(--muted);
             display: flex;
             align-items: center;
             justify-content: center;
             transition: background 0.2s, color 0.2s;
+            font-size: 1.2em;
+            line-height: 1;
         }
-        .icon-btn:hover { background-color: #e2e6ea; color: #007bff; }
+        .icon-btn:hover { background-color: #e2e6ea; color: var(--primary); }
         .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
-        
-        /* Blue Copy Button for Main Result */
-        #copy-button {
-            background-color: #007bff;
-            color: white;
-            padding: 8px;
-        }
-        #copy-button:hover { background-color: #0056b3; color: white; }
+        #copy-button { background-color: var(--primary); color: #fff; padding: 8px; }
+        #copy-button:hover { background-color: var(--primary-dark); color: #fff; }
 
-        /* Grid */
-        #result-grid { margin-top: 1.5em; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px; }
-        .cover-item img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; }
+        /* 表紙グリッド */
+        #result-grid {
+            margin-top: 1.5em;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 16px;
+        }
+        .cover-item img {
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            object-fit: cover;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            display: block;
+        }
         .cover-item img:hover { opacity: 0.8; }
-        .loading, .error { grid-column: 1 / -1; font-size: 1.2em; color: #555; text-align: center; padding: 20px; }
-        
-        /* Lightbox */
-        #lightbox { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.85); display: none; flex-direction: column; justify-content: center; align-items: center; padding: 20px; z-index: 1000; }
+        .cover-caption { margin-top: 4px; font-size: 0.8em; color: var(--muted); text-align: center; }
+        .loading, .error {
+            grid-column: 1 / -1;
+            font-size: 1.1em;
+            color: var(--muted);
+            text-align: center;
+            padding: 20px;
+            word-break: break-word;
+        }
+
+        /* 拡大表示 */
+        #lightbox {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 1000;
+        }
+        #lightbox.open { display: flex; }
         #lightbox-img { max-width: 100%; max-height: 85%; object-fit: contain; }
-        #close-button { position: absolute; top: 20px; right: 30px; font-size: 3em; color: white; cursor: pointer; line-height: 0.5; }
-        #filename-area { position: absolute; bottom: 20px; left: 20px; right: 20px; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; font-size: 0.9em; }
+        #close-button {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 3em;
+            color: #fff;
+            background: none;
+            border: none;
+            cursor: pointer;
+            line-height: 1;
+        }
+        #filename-area {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+        }
         #filename-text { flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     </style>
 </head>
 <body>
     <h1>漫画表紙 全巻検索</h1>
-    
-    <div class="input-wrapper" id="search-wrapper">
-        <input type="text" id="mangaTitle" placeholder="漫画のタイトルを入力" lang="ja">    
-        <span class="clear-btn" id="clear-search">&times;</span>
-        <button id="searchButton">検索</button>
+
+    <div class="search-row">
+        <div class="search-box">
+            <input type="text" id="mangaTitle" placeholder="漫画のタイトルを入力" lang="ja" autocomplete="off">
+            <button type="button" class="clear-btn" id="clear-search" title="クリア">&times;</button>
+        </div>
+        <button type="button" id="searchButton">検索</button>
+        <button type="button" id="key-settings" class="icon-btn" title="APIキーの設定">⚙</button>
     </div>
+    <p id="search-note" hidden></p>
 
     <div id="result-area">
         <div id="copy-preview">
             <span id="preview-text"></span>
-            <button id="copy-button" class="icon-btn" title="コピー">
+            <button type="button" id="copy-button" class="icon-btn" title="コピー">
                 <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
             </button>
         </div>
 
         <details id="edit-controls" open>
-            <summary>  作者・タイトル・巻数を編集</summary>
+            <summary>作者・タイトル・巻数を編集</summary>
             <fieldset>
                 <div class="control-group">
                     <label for="author-input">作者名</label>
                     <input type="text" id="author-input">
-                    <button class="icon-btn copy-part-btn" data-target="author-input" title="コピー">
+                    <button type="button" class="icon-btn copy-part-btn" data-target="author-input" title="コピー">
                         <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
                     </button>
                 </div>
                 <div class="control-group">
                     <label for="title-input">タイトル</label>
                     <input type="text" id="title-input">
-                    <button class="icon-btn copy-part-btn" data-target="title-input" title="コピー">
+                    <button type="button" class="icon-btn copy-part-btn" data-target="title-input" title="コピー">
                         <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
                     </button>
                 </div>
@@ -156,7 +286,6 @@
                     <input type="number" id="volumeA-input" placeholder="全/開始" min="1">
                     <span>-</span>
                     <input type="number" id="volumeB-input" placeholder="最終" min="1">
-                    
                     <span id="wiki-status"></span>
                 </div>
             </fieldset>
@@ -166,288 +295,572 @@
     <div id="result-grid"></div>
 
     <div id="lightbox">
-        <span id="close-button">&times;</span>
-        <img id="lightbox-img" src="">
+        <button type="button" id="close-button" title="閉じる">&times;</button>
+        <img id="lightbox-img" alt="">
         <div id="filename-area">
             <span id="filename-text"></span>
-            <button id="filename-copy-btn">コピー</button>
+            <button type="button" id="filename-copy-btn">コピー</button>
         </div>
     </div>
 
     <script>
-        // --- 1. DOM Elements ---
-        const mangaTitleInput = document.getElementById('mangaTitle');
-        const searchButton = document.getElementById('searchButton');
-        const clearSearchBtn = document.getElementById('clear-search');
-        const resultArea = document.getElementById('result-area');
-        const previewText = document.getElementById('preview-text');
-        const copyButton = document.getElementById('copy-button');
-        const authorInput = document.getElementById('author-input');
-        const titleInput = document.getElementById('title-input');
-        const volumeA_Input = document.getElementById('volumeA-input');
-        const volumeB_Input = document.getElementById('volumeB-input');
-        const resultGrid = document.getElementById('result-grid');
-        const lightbox = document.getElementById('lightbox');
-        const lightboxImg = document.getElementById('lightbox-img');
-        const closeButton = document.getElementById('close-button');
-        const filenameArea = document.getElementById('filename-area');
-        const filenameText = document.getElementById('filename-text');
-        const filenameCopyBtn = document.getElementById('filename-copy-btn');
-        const wikiStatusSpan = document.getElementById('wiki-status');
+        'use strict';
 
-        // Icons
+        // --- 1. 定数・DOM ---
+        const STORAGE_KEY = 'google_books_key';
+        const BOOKS_API = 'https://www.googleapis.com/books/v1/volumes';
+        const WIKI_API = 'https://ja.wikipedia.org/w/api.php';
+
+        const $ = (id) => document.getElementById(id);
+        const el = {
+            titleQuery: $('mangaTitle'),
+            searchButton: $('searchButton'),
+            clearSearch: $('clear-search'),
+            keySettings: $('key-settings'),
+            searchNote: $('search-note'),
+            resultArea: $('result-area'),
+            previewText: $('preview-text'),
+            copyButton: $('copy-button'),
+            author: $('author-input'),
+            title: $('title-input'),
+            volA: $('volumeA-input'),
+            volB: $('volumeB-input'),
+            wikiStatus: $('wiki-status'),
+            grid: $('result-grid'),
+            lightbox: $('lightbox'),
+            lightboxImg: $('lightbox-img'),
+            closeButton: $('close-button'),
+            filenameText: $('filename-text'),
+            filenameCopy: $('filename-copy-btn'),
+        };
+
         const ICON_COPY = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
         const ICON_CHECK = '<svg viewBox="0 0 24 24" style="fill:#28a745"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
 
-        // --- 2. Helper Functions ---
+        // 連続検索時に、古い検索の結果で画面を上書きしないための状態
+        let searchSeq = 0;
+        let currentController = null;
+
+        // --- 2. 汎用ヘルパー ---
+        // 全角・半角、大文字・小文字、空白の違いを無視して比較するための正規化
+        const normalize = (s) => (s || '').normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+
+        const createEl = (tag, props = {}, text) => {
+            const node = document.createElement(tag);
+            Object.assign(node, props);
+            if (text !== undefined) node.textContent = text;
+            return node;
+        };
+
+        const showGridMessage = (className, text) => {
+            el.grid.replaceChildren(createEl('div', { className }, text));
+        };
+
+        const setSearching = (isSearching) => {
+            el.searchButton.disabled = isSearching;
+            el.searchButton.textContent = isSearching ? '検索中…' : '検索';
+        };
+
+        const writeClipboard = async (text) => {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return;
+            }
+            // file:// などで Clipboard API が使えない場合の予備手段
+            const ta = createEl('textarea', { value: text });
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            const ok = document.execCommand('copy');
+            ta.remove();
+            if (!ok) throw new Error('copy command failed');
+        };
+
+        const flashCopied = (btn) => {
+            if (btn.dataset.flashing) return;
+            btn.dataset.flashing = '1';
+            const original = btn.innerHTML;
+            btn.innerHTML = btn.classList.contains('icon-btn') ? ICON_CHECK : '完了!';
+            setTimeout(() => {
+                btn.innerHTML = original;
+                delete btn.dataset.flashing;
+            }, 1500);
+        };
+
+        const copyText = async (text, btn) => {
+            try {
+                await writeClipboard(text);
+                flashCopied(btn);
+            } catch (err) {
+                console.error(err);
+                alert('コピーに失敗しました。');
+            }
+        };
+
+        // --- 3. 文字列・ファイル名の生成 ---
         const generateFinalString = () => {
-            const author = authorInput.value;
-            const title = titleInput.value;
-            const valA = volumeA_Input.value;
-            const valB = volumeB_Input.value;
-            let finalString = `[${author}] ${title}`;
-            if (valA && valB) { finalString = `[${author}] ${title} 第${valA}-${valB}巻`; }
-            else if (valA) { finalString = `[${author}] ${title} 全${valA}巻`; }
-            return finalString;
+            const author = el.author.value.trim();
+            const title = el.title.value.trim();
+            const valA = el.volA.value.trim();
+            const valB = el.volB.value.trim();
+            let result = author ? `[${author}] ${title}` : title;
+            if (valA && valB) {
+                result += ` 第${valA}-${valB}巻`;
+            } else if (valA) {
+                result += ` 全${valA}巻`;
+            }
+            return result;
         };
 
         const updatePreview = () => {
-            previewText.textContent = generateFinalString();
+            const text = generateFinalString();
+            el.previewText.textContent = text;
+            el.previewText.title = text;
         };
 
-        const findBestAuthor = (items) => {
-            const authorCounts = new Map();
-            items.slice(0, 10).forEach(item => {
-                if (item.volumeInfo?.authors) {
-                    item.volumeInfo.authors.forEach(author => authorCounts.set(author, (authorCounts.get(author) || 0) + 1));
-                }
-            });
-            if (authorCounts.size === 0) return '';
-            let maxCount = 0, bestAuthors = [];
-            for (const [author, count] of authorCounts.entries()) {
-                if (count > maxCount) { maxCount = count; bestAuthors = [author]; }
-                else if (count === maxCount) { bestAuthors.push(author); }
-            }
-            if (bestAuthors.length === 1) return bestAuthors[0];
-            return bestAuthors.find(author => /[一-龠ぁ-んァ-ヶ]/.test(author)) || bestAuthors[0];
+        // Windows で使えない文字を除去し、空白をアンダースコアに置換
+        const sanitizeFilePart = (s) => s
+            .trim()
+            .replace(/[\\/:*?"<>|]/g, '_')
+            .replace(/\s+/g, '_');
+
+        const buildFilename = (volume) => {
+            const parts = [sanitizeFilePart(el.author.value), sanitizeFilePart(el.title.value)];
+            if (volume) parts.push(`v${String(volume).padStart(2, '0')}`);
+            const base = parts.filter(Boolean).join('_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+            return `${base || 'cover'}.jpg`;
         };
+
+        // --- 4. Google Books ---
+        const findBestAuthor = (items) => {
+            // 正規化したキーごとに集計（「尾田栄一郎」と「尾田 栄一郎」を同一視）
+            const counts = new Map();
+            items.slice(0, 10).forEach(item => {
+                (item.volumeInfo?.authors || []).forEach(name => {
+                    const key = normalize(name);
+                    const entry = counts.get(key) || { name, count: 0 };
+                    entry.count++;
+                    counts.set(key, entry);
+                });
+            });
+            if (!counts.size) return '';
+            const entries = [...counts.values()];
+            const max = Math.max(...entries.map(e => e.count));
+            const best = entries.filter(e => e.count === max).map(e => e.name);
+            return best.find(name => /[一-龠ぁ-んァ-ヶ]/.test(name)) || best[0];
+        };
+
+        // タイトル末尾の巻数・レーベル表記などを取り除く
+        const VOLUME_SUFFIX_RE = /(?:\s*[,、]?\s*Vol\.?\s*\d+|\s+\d+|\s*第\d+巻|\s*\(\d+\)|\s*\(通常版\)|\s*\d+巻).*$/i;
+        const getBaseTitle = (rawTitle) => (rawTitle || '').normalize('NFKC').replace(VOLUME_SUFFIX_RE, '').trim();
 
         const findBestTitle = (items, userInput) => {
-            const titleCounts = new Map();
+            const key = normalize(userInput);
+            const counts = new Map();
             items.slice(0, 10).forEach(item => {
-                if (item.volumeInfo?.title) {
-                    const baseTitle = item.volumeInfo.title.replace(/(, Vol\. \d+| \d+| 第\d+巻|（[0-9０-９]+）|\([0-9０-９]+\)|\(通常版\)).*/, '').trim();
-                    if (baseTitle && baseTitle.toLowerCase().includes(userInput.toLowerCase())) {
-                        titleCounts.set(baseTitle, (titleCounts.get(baseTitle) || 0) + 1);
-                    }
+                const base = getBaseTitle(item.volumeInfo?.title);
+                if (base && normalize(base).includes(key)) {
+                    counts.set(base, (counts.get(base) || 0) + 1);
                 }
             });
-            if (titleCounts.size === 0) return userInput;
-            let bestTitle = userInput, maxCount = 0;
-            for (const [title, count] of titleCounts.entries()) {
-                if (count > maxCount) { maxCount = count; bestTitle = title; }
+            let bestTitle = userInput;
+            let maxCount = 0;
+            for (const [title, count] of counts) {
+                if (count > maxCount) {
+                    maxCount = count;
+                    bestTitle = title;
+                }
             }
             return bestTitle;
         };
 
+        // 巻数を抽出（取れない場合は null）
         const extractVolumeNumber = (title) => {
-            if (!title) return Infinity;
-            const match = title.match(/(?:[ (\[第#]|\bVol\.\s?)([0-9０-９]+)/);
-            return match ? parseInt(match[1].replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)), 10) : Infinity;
+            if (!title) return null;
+            const match = title.normalize('NFKC').match(/(?:vol\.?\s*|第|#|[\s(\[])(\d{1,4})(?!\d)/i);
+            return match ? parseInt(match[1], 10) : null;
         };
 
-        // --- 3. Google/Wiki Helper Logic ---
-        const searchWikipedia = async (title) => {
-            wikiStatusSpan.innerHTML = '';
-           
-            const author = authorInput.value;
-            const searchQuery = `${title} 漫画 作者 何巻まで`;
-            const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
-            
-            // Google Button with Icon
-            const googleBtnHtml = `<a href="${googleSearchUrl}" target="_blank" class="google-btn">Google ↗</a>`;
-
+        const normalizeImageUrl = (url) => {
             try {
-                wikiStatusSpan.innerHTML = googleBtnHtml;
-
-                const searchUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(title)}&format=json&origin=*`;
-                const searchRes = await fetch(searchUrl);
-                const searchData = await searchRes.json();
-                
-                if (!searchData.query.search.length) return;
-
-                const bestPage = searchData.query.search[0];
-                const pageId = bestPage.pageid;
-
-                const parseUrl = `https://ja.wikipedia.org/w/api.php?action=parse&pageid=${pageId}&prop=wikitext&format=json&origin=*`;
-                const parseRes = await fetch(parseUrl);
-                const parseData = await parseRes.json();
-                const wikitext = parseData.parse.wikitext['*'];
-
-                const volMatch = wikitext.match(/\|(?:巻数|既刊)\s*=\s*(.*?)(?:\n|\||<br)/);
-                const rawVol = volMatch ? volMatch[1].trim() : "";
-                
-                let badgeHtml = '';
-                if (rawVol) {
-                    const cleanVol = rawVol.replace(/\[\[|\]\]/g, '').replace(/<ref.*?>.*?<\/ref>/g, '');
-                    if (cleanVol.match(/全|完|End/)) {
-                        badgeHtml = `<span class="wiki-badge wiki-completed">✅ ${cleanVol}</span> `;
-                    } else if (cleanVol.match(/既刊|連載|現在/)) {
-                        badgeHtml = `<span class="wiki-badge wiki-ongoing">▶ ${cleanVol}</span> `;
-                    } else if (/\d/.test(cleanVol)) {
-                        badgeHtml = `<span class="wiki-badge wiki-ongoing">? ${cleanVol}</span> `;
-                    }
-                }
-                
-                if (badgeHtml) {
-                    wikiStatusSpan.innerHTML = badgeHtml + googleBtnHtml;
-                }
-
-            } catch (e) {
-                console.log("Wiki info fetch failed, keeping Google button.");
+                const u = new URL(url.replace(/^http:/, 'https:'));
+                u.searchParams.delete('edge'); // ページめくり風の加工を外す
+                return u.toString();
+            } catch {
+                return url;
             }
         };
 
-        // --- 4. Main Search Logic ---
+        const toLargeImageUrl = (url) => {
+            try {
+                const u = new URL(url);
+                u.searchParams.set('zoom', '0');
+                return u.toString();
+            } catch {
+                return url;
+            }
+        };
+
+        const fetchBooks = async (query, apiKey, signal) => {
+            const params = new URLSearchParams({
+                q: query,
+                langRestrict: 'ja',
+                printType: 'books',
+                maxResults: '40',
+                key: apiKey,
+            });
+            const res = await fetch(`${BOOKS_API}?${params}`, { signal });
+            let data;
+            try {
+                data = await res.json();
+            } catch {
+                const err = new Error(`HTTP ${res.status}`);
+                err.status = res.status;
+                throw err;
+            }
+            if (!res.ok || data.error) {
+                const code = data.error?.code ?? res.status;
+                const message = data.error?.message ?? res.statusText;
+                const err = new Error(`APIエラー (${code}): ${message}`);
+                err.status = code;
+                throw err;
+            }
+            return data.items || [];
+        };
+
+        // intitle: で検索し、0件なら通常検索に切り替える
+        // （2026年10月時点で、intitle: / inauthor: が0件になる不具合の報告あり）
+        const searchBooks = async (userInput, apiKey, signal) => {
+            const intitleItems = await fetchBooks(`intitle:${userInput}`, apiKey, signal);
+            if (intitleItems.length) return { items: intitleItems, mode: 'intitle' };
+
+            const plainItems = await fetchBooks(userInput, apiKey, signal);
+            const key = normalize(userInput);
+            const filtered = plainItems.filter(item => normalize(item.volumeInfo?.title).includes(key));
+            if (filtered.length) return { items: filtered, mode: 'plain-filtered' };
+            return { items: plainItems, mode: 'plain' };
+        };
+
+        const showSearchNote = (mode) => {
+            const notes = {
+                'plain-filtered': 'タイトル指定検索（intitle:）が0件だったため、通常検索の結果からタイトルに入力語を含む本を表示しています。',
+                'plain': 'タイトル指定検索（intitle:）が0件だったため、通常検索の結果をそのまま表示しています。関係のない本が混ざる可能性があります。',
+            };
+            el.searchNote.textContent = notes[mode] || '';
+            el.searchNote.hidden = !notes[mode];
+        };
+
+        const buildCoverList = (items, fallbackTitle) => {
+            const unique = new Map();
+            items.forEach(item => {
+                const info = item.volumeInfo || {};
+                const thumb = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail;
+                if (!thumb) return;
+                const imageUrl = normalizeImageUrl(thumb);
+                if (unique.has(imageUrl)) return;
+                unique.set(imageUrl, {
+                    title: info.title || fallbackTitle,
+                    imageUrl,
+                    volume: extractVolumeNumber(info.title),
+                });
+            });
+            return [...unique.values()].sort((a, b) => {
+                if (a.volume === b.volume) return 0;
+                if (a.volume === null) return 1;
+                if (b.volume === null) return -1;
+                return a.volume - b.volume;
+            });
+        };
+
+        const renderCovers = (covers) => {
+            if (!covers.length) {
+                showGridMessage('error', '表紙画像のある本が見つかりませんでした。');
+                return;
+            }
+            const fragment = document.createDocumentFragment();
+            covers.forEach(book => {
+                const item = createEl('div', { className: 'cover-item' });
+                const img = createEl('img', {
+                    src: book.imageUrl,
+                    alt: book.title,
+                    title: book.title,
+                    loading: 'lazy',
+                });
+                img.dataset.volume = book.volume ?? '';
+                const caption = createEl('div', { className: 'cover-caption' }, book.volume ? `第${book.volume}巻` : '巻数不明');
+                item.append(img, caption);
+                fragment.append(item);
+            });
+            el.grid.replaceChildren(fragment);
+        };
+
+        // --- 5. Wikipedia ---
+        const cleanWikiValue = (raw) => raw
+            .split(/<br\s*\/?>/i)[0]
+            .replace(/<ref[^>]*\/>/gi, '')
+            .replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, '')
+            .replace(/<ref[^>]*>.*$/i, '')
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/\{\{[^{}]*\}\}/g, '')
+            .replace(/\[\[(?:[^|\]]*\|)?([^\]]*)\]\]/g, '$1')
+            .replace(/<[^>]+>/g, '')
+            .replace(/'{2,}/g, '')
+            .trim();
+
+        const fetchWikiVolume = async (title, signal) => {
+            const searchParams = new URLSearchParams({
+                action: 'query',
+                list: 'search',
+                srsearch: title,
+                srlimit: '5',
+                format: 'json',
+                formatversion: '2',
+                origin: '*',
+            });
+            const searchRes = await fetch(`${WIKI_API}?${searchParams}`, { signal });
+            const searchData = await searchRes.json();
+            const hits = searchData.query?.search || [];
+            if (!hits.length) return null;
+
+            // 記事名がタイトルと一致するもの → 前方一致するもの → 先頭の順で選ぶ
+            const key = normalize(title);
+            const page = hits.find(h => normalize(h.title) === key)
+                || hits.find(h => normalize(h.title).startsWith(key))
+                || hits[0];
+
+            const parseParams = new URLSearchParams({
+                action: 'parse',
+                pageid: String(page.pageid),
+                prop: 'wikitext',
+                format: 'json',
+                formatversion: '2',
+                origin: '*',
+            });
+            const parseRes = await fetch(`${WIKI_API}?${parseParams}`, { signal });
+            const parseData = await parseRes.json();
+            const wikitext = parseData.parse?.wikitext;
+            if (!wikitext) return null;
+
+            // 「|巻数=」「| 巻数 = 」のどちらの書き方にも対応
+            const match = wikitext.match(/^\s*\|\s*(?:巻数|既刊)\s*=\s*(.+)$/m);
+            if (!match) return null;
+            const text = cleanWikiValue(match[1]);
+            return text ? { text, pageId: page.pageid, pageTitle: page.title } : null;
+        };
+
+        const renderWikiStatus = async (title, seq, signal) => {
+            const googleQuery = `${title} 漫画 何巻まで`;
+            const googleLink = createEl('a', {
+                href: `https://www.google.com/search?q=${encodeURIComponent(googleQuery)}`,
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                className: 'link-btn',
+            }, 'Google ↗');
+            el.wikiStatus.replaceChildren(googleLink);
+
+            try {
+                const info = await fetchWikiVolume(title, signal);
+                if (seq !== searchSeq || !info) return;
+
+                const isCompleted = /全|完結|完|End/i.test(info.text);
+                const isOngoing = /既刊|連載|現在/.test(info.text);
+                if (!isCompleted && !isOngoing && !/\d/.test(info.text.normalize('NFKC'))) return;
+
+                const mark = isCompleted ? '✅' : isOngoing ? '▶' : '?';
+                const badge = createEl('button', {
+                    type: 'button',
+                    className: `wiki-badge ${isCompleted ? 'wiki-completed' : 'wiki-ongoing'}`,
+                    title: `出典: Wikipedia「${info.pageTitle}」\nクリックで巻数欄に反映`,
+                }, `${mark} ${info.text}`);
+
+                // 完結済みなら「全N巻」、それ以外は「第1-N巻」として反映
+                badge.addEventListener('click', () => {
+                    const num = info.text.normalize('NFKC').match(/\d+/);
+                    if (!num) return;
+                    if (isCompleted) {
+                        el.volA.value = num[0];
+                        el.volB.value = '';
+                    } else {
+                        el.volA.value = '1';
+                        el.volB.value = num[0];
+                    }
+                    updatePreview();
+                });
+
+                const wikiLink = createEl('a', {
+                    href: `https://ja.wikipedia.org/?curid=${info.pageId}`,
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    className: 'link-btn',
+                }, 'Wiki ↗');
+
+                el.wikiStatus.replaceChildren(badge, wikiLink, googleLink);
+            } catch (err) {
+                if (err.name !== 'AbortError') console.warn('Wikipedia情報の取得に失敗しました', err);
+            }
+        };
+
+        // --- 6. APIキー管理 ---
+        const getApiKey = () => {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) return saved;
+            const input = prompt('Google Books APIキーを入力してください（このブラウザに保存されます）:');
+            const key = input?.trim();
+            if (!key) {
+                alert('APIキーがないため検索できません。');
+                return null;
+            }
+            localStorage.setItem(STORAGE_KEY, key);
+            return key;
+        };
+
+        const editApiKey = () => {
+            const current = localStorage.getItem(STORAGE_KEY);
+            const masked = current ? `${current.slice(0, 4)}…${current.slice(-4)}` : '未設定';
+            const input = prompt(`APIキーを変更します（現在: ${masked}）\n空欄のままOKを押すと削除します。`, '');
+            if (input === null) return;
+            const key = input.trim();
+            if (key) {
+                localStorage.setItem(STORAGE_KEY, key);
+                alert('APIキーを保存しました。');
+            } else {
+                localStorage.removeItem(STORAGE_KEY);
+                alert('APIキーを削除しました。');
+            }
+        };
+
+        // --- 7. メイン検索 ---
         const searchCovers = async () => {
-            const userInput = mangaTitleInput.value.trim();
+            const userInput = el.titleQuery.value.trim();
             if (!userInput) return;
-      
-            let apiKey = localStorage.getItem('google_books_key');
-            if (!apiKey) {
-                apiKey = prompt('APIキーを入力してください（端末に保存されます）:');
-                if (apiKey) {
-                    localStorage.setItem('google_books_key', apiKey);
-                } else {
-                    alert('APIキーがないため検索できません。');
+
+            const apiKey = getApiKey();
+            if (!apiKey) return;
+
+            currentController?.abort();
+            const controller = new AbortController();
+            currentController = controller;
+            const seq = ++searchSeq;
+
+            setSearching(true);
+            showGridMessage('loading', '検索中...');
+            el.resultArea.classList.remove('visible');
+            el.searchNote.hidden = true;
+            el.wikiStatus.replaceChildren();
+
+            try {
+                const { items, mode } = await searchBooks(userInput, apiKey, controller.signal);
+                if (seq !== searchSeq) return;
+
+                if (!items.length) {
+                    showGridMessage('error', '作品が見つかりませんでした。');
                     return;
                 }
-            }
-            
-            resultGrid.innerHTML = '<div class="loading">検索中...</div>';
-            resultArea.style.display = 'none';
-            wikiStatusSpan.innerHTML = ''; 
 
-            try {
-                const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(userInput)}&langRestrict=ja&printType=books&maxResults=40&key=${apiKey}`;
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                resultGrid.innerHTML = '';
-                if (data.totalItems > 0 && data.items?.length > 0) {
-                    const bestAuthor = findBestAuthor(data.items);
-                    const bestTitle = findBestTitle(data.items, userInput);
-                    
-                    authorInput.value = bestAuthor;
-                    titleInput.value = bestTitle;
-                    volumeA_Input.value = '';
-                    volumeB_Input.value = '';
-                    updatePreview();
-                    
-                    searchWikipedia(bestTitle); // Pass title, function reads author from input
+                const bestTitle = findBestTitle(items, userInput);
+                el.author.value = findBestAuthor(items);
+                el.title.value = bestTitle;
+                el.volA.value = '';
+                el.volB.value = '';
+                updatePreview();
 
-                    resultArea.style.display = 'flex';
-                    
-                    data.items.sort((a,b) => extractVolumeNumber(a.volumeInfo.title) - extractVolumeNumber(b.volumeInfo.title));
-                    const uniqueCovers = new Map();
-                    data.items.forEach(item => {
-                        if (item.volumeInfo.imageLinks?.thumbnail) {
-                            const imageUrl = item.volumeInfo.imageLinks.thumbnail.replace('http://', 'https://');
-                            if (!uniqueCovers.has(imageUrl)) {
-                                uniqueCovers.set(imageUrl, { 
-                                    title: item.volumeInfo.title || userInput, 
-                                    imageUrl: imageUrl,
-                                    volume: extractVolumeNumber(item.volumeInfo.title)
-                                });
-                            }
-                        }
-                    });
-
-                    uniqueCovers.forEach(book => {
-                        const coverDiv = document.createElement('div');
-                        coverDiv.className = 'cover-item';
-                        coverDiv.innerHTML = `<img src="${book.imageUrl}" alt="${book.title}" data-volume="${book.volume}">`;
-                        resultGrid.appendChild(coverDiv);
-                    });
-                } else {
-                    resultGrid.innerHTML = '<div class="error">作品が見つかりませんでした。</div>';
+                el.resultArea.classList.add('visible');
+                showSearchNote(mode);
+                renderCovers(buildCoverList(items, userInput));
+                renderWikiStatus(bestTitle, seq, controller.signal);
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.error(err);
+                let hint = '';
+                if ([400, 401, 403].includes(err.status)) {
+                    hint = '（APIキーが原因の可能性があります。⚙ から再設定できます）';
+                } else if (err.status === 429) {
+                    hint = '（APIの利用上限に達した可能性があります）';
                 }
-            } catch (error) {
-                console.error(error);
-                resultGrid.innerHTML = '<div class="error">検索中にエラーが発生しました。</div>';
+                showGridMessage('error', `検索中にエラーが発生しました：${err.message}${hint}`);
+            } finally {
+                if (seq === searchSeq) setSearching(false);
             }
         };
-        
-        const closeLightbox = () => { lightbox.style.display = 'none'; };
 
-        // --- 5. Event Listeners ---
-        searchButton.addEventListener('click', searchCovers);
-        mangaTitleInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') searchCovers(); });
-        mangaTitleInput.addEventListener('input', () => { clearSearchBtn.style.display = mangaTitleInput.value ? 'block' : 'none'; });
-        
-        [authorInput, titleInput, volumeA_Input, volumeB_Input].forEach(input => {
+        // --- 8. 拡大表示 ---
+        const openLightbox = (img) => {
+            const thumbUrl = img.src;
+            // 大きい画像が取得できない場合はサムネイルを表示
+            el.lightboxImg.onerror = () => {
+                el.lightboxImg.onerror = null;
+                el.lightboxImg.src = thumbUrl;
+            };
+            el.lightboxImg.src = toLargeImageUrl(thumbUrl);
+            el.lightboxImg.alt = img.alt;
+            el.filenameText.textContent = buildFilename(img.dataset.volume);
+            el.lightbox.classList.add('open');
+        };
+
+        const closeLightbox = () => {
+            el.lightbox.classList.remove('open');
+            el.lightboxImg.onerror = null;
+            el.lightboxImg.removeAttribute('src');
+        };
+
+        // --- 9. イベント ---
+        el.searchButton.addEventListener('click', searchCovers);
+
+        el.titleQuery.addEventListener('keydown', (e) => {
+            // 日本語入力の変換確定のEnterでは検索しない
+            if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) searchCovers();
+        });
+
+        el.titleQuery.addEventListener('input', () => {
+            el.clearSearch.classList.toggle('visible', Boolean(el.titleQuery.value));
+        });
+
+        el.clearSearch.addEventListener('click', () => {
+            currentController?.abort();
+            searchSeq++;
+            setSearching(false);
+            el.titleQuery.value = '';
+            el.clearSearch.classList.remove('visible');
+            el.grid.replaceChildren();
+            el.resultArea.classList.remove('visible');
+            el.searchNote.hidden = true;
+            el.wikiStatus.replaceChildren();
+            el.titleQuery.focus();
+        });
+
+        el.keySettings.addEventListener('click', editApiKey);
+
+        [el.author, el.title, el.volA, el.volB].forEach(input => {
             input.addEventListener('input', updatePreview);
         });
-        
-        clearSearchBtn.addEventListener('click', () => {
-            mangaTitleInput.value = '';
-            resultGrid.innerHTML = '';
-            resultArea.style.display = 'none';
-            clearSearchBtn.style.display = 'none';
-            wikiStatusSpan.innerHTML = '';
-            mangaTitleInput.focus();
-        });
 
-        // Clipboard Copy with Icon Feedback
-        const copyToClipboard = (text, btnElement) => {
-            navigator.clipboard.writeText(text).then(() => {
-                // Change icon to checkmark
-                btnElement.innerHTML = ICON_CHECK;
-                setTimeout(() => { 
-                    // Revert to original icon
-                    btnElement.innerHTML = ICON_COPY; 
-                }, 1500);
-            });
-        };
-
-        copyButton.addEventListener('click', () => copyToClipboard(generateFinalString(), copyButton));
-        
-        document.querySelectorAll('.copy-part-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const targetId = e.currentTarget.dataset.target; // Use currentTarget for button with SVG
-                const targetInput = document.getElementById(targetId);
-                copyToClipboard(targetInput.value, e.currentTarget);
-            });
-        });
-
-        resultGrid.addEventListener('click', (e) => {
-            if (e.target.tagName === 'IMG') {
-                lightboxImg.src = e.target.src.replace(/&zoom=\d+/, '&zoom=0');
-                const author = authorInput.value.replace(/\s/g, '_');
-                const title = titleInput.value.replace(/\s/g, '_');
-                const volume = e.target.dataset.volume;
-                const filename = `${author}_${title}_${volume !== 'Infinity' ? 'v' + String(volume).padStart(2, '0') : ''}.jpg`.replace(/__+/g, '_').replace(/^_|_$/g, '');
-                filenameText.textContent = filename;
-                lightbox.style.display = 'flex';
-            }
-        });
-
-        filenameCopyBtn.addEventListener('click', () => {
-             navigator.clipboard.writeText(filenameText.textContent).then(() => {
-                filenameCopyBtn.textContent = '完了!';
-                setTimeout(() => { filenameCopyBtn.textContent = 'コピー'; }, 1500);
-            });
-        });
-
-        closeButton.addEventListener('click', closeLightbox);
-        lightbox.addEventListener('click', (e) => { if (e.target === lightbox || e.target === lightboxImg) { closeLightbox(); } });
-        
-        volumeA_Input.addEventListener('keypress', (e) => {
+        el.volA.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                volumeB_Input.focus();
+                el.volB.focus();
             }
         });
-    </script>    
+
+        el.copyButton.addEventListener('click', () => copyText(generateFinalString(), el.copyButton));
+
+        document.querySelectorAll('.copy-part-btn').forEach(btn => {
+            btn.addEventListener('click', () => copyText($(btn.dataset.target).value, btn));
+        });
+
+        el.grid.addEventListener('click', (e) => {
+            const img = e.target.closest('img');
+            if (img) openLightbox(img);
+        });
+
+        el.filenameCopy.addEventListener('click', () => copyText(el.filenameText.textContent, el.filenameCopy));
+        el.closeButton.addEventListener('click', closeLightbox);
+        el.lightbox.addEventListener('click', (e) => {
+            if (e.target === el.lightbox || e.target === el.lightboxImg) closeLightbox();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && el.lightbox.classList.contains('open')) closeLightbox();
+        });
+    </script>
 </body>
 </html>
