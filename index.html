@@ -332,7 +332,16 @@
                 resultGrid.innerHTML = `<div class="loading">検索中...（再試行 ${attempt + 1}/${MAX_RETRIES}）</div>`;
                 await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
             }
-        };        
+        };
+        // 検索が0件・エラーのときも手動入力できるように入力欄を表示する
+        const showManualInput = (userInput) => {
+            authorInput.value = '';
+            titleInput.value = userInput;
+            volumeA_Input.value = '';
+            volumeB_Input.value = '';
+            updatePreview();
+            resultArea.style.display = 'flex';
+        };                
         const searchCovers = async (options) => {
             const plainSearch = options?.plainSearch === true;
             const userInput = mangaTitleInput.value.trim();
@@ -368,6 +377,7 @@
                     errorDiv.className = 'error';
                     errorDiv.textContent = `APIエラー (${code}): ${message}`;
                     resultGrid.appendChild(errorDiv);
+                    showManualInput(userInput);
                     return;
                 }
                 if (data.totalItems > 0 && data.items?.length > 0) {
@@ -407,6 +417,7 @@
                     });
                 } else {
                     resultGrid.innerHTML = '<div class="error">作品が見つかりませんでした。</div>';
+                    showManualInput(userInput);
                     // intitle: で0件のときは、通常検索に切り替えるボタンを表示
                     if (!plainSearch) {
                         const errorDiv = resultGrid.querySelector('.error');
@@ -421,6 +432,7 @@
             } catch (error) {
                 console.error(error);
                 resultGrid.innerHTML = '<div class="error">検索中にエラーが発生しました。</div>';
+                showManualInput(userInput);
             }
         };
         
